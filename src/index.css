@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+::-webkit-scrollbar-thumb {
+  background: #243046;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #384b6c;
+}
+
+/* Slider custom styling */
+input[type="range"] {
+  accent-color: #06b6d4;
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(239, 68, 68, 0.75);
+  }
+}
+
+.unstable-nucleus-pulse {
+  animation: pulseGlow 1.8s infinite ease-in-out;
+}
