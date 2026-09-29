@@ -894,10 +894,10 @@ export const ExperimentalLab: React.FC = () => {
         </div>
       )}
 
-      {/* MAIN WORKBENCH GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column: Reagents & Safe Chemical Shelf (Span 4) */}
-        <div className="lg:col-span-4 flex flex-col gap-4">
+      {/* MAIN WORKBENCH RESPONSIVE CONTAINER */}
+      <div className="w-full flex flex-col md:flex-row gap-5 items-start overflow-x-hidden">
+        {/* Left Column: Reagents & Safe Chemical Shelf */}
+        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -982,8 +982,10 @@ export const ExperimentalLab: React.FC = () => {
           </div>
         </div>
 
-        {/* Middle Column: Interactive Beaker Workbench & Real-time Canvas (Span 5) */}
-        <div className="lg:col-span-5 flex flex-col gap-4 items-center">
+        {/* Main Simulation Stage & Instruments */}
+        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+          {/* Middle Column: Interactive Beaker Workbench & Real-time Canvas */}
+          <div className="w-full lg:flex-1 flex flex-col gap-4 items-center">
           <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center relative ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -1103,8 +1105,8 @@ export const ExperimentalLab: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Precision Instruments (pH Meter, Thermometer, Balance) (Span 3) */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
+          {/* Right Column: Precision Instruments (pH Meter, Thermometer, Balance) */}
+          <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
           {/* Digital pH Meter Card */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
@@ -1232,6 +1234,7 @@ export const ExperimentalLab: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

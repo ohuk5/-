@@ -372,10 +372,10 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   const colors = CATEGORY_COLORS[currentElement.category] || CATEGORY_COLORS['nonmetal'];
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left: Particle Controls Deck (Span 4) */}
-        <div className="order-2 lg:order-1 lg:col-span-4 flex flex-col gap-4">
+    <div className="w-full space-y-6 overflow-x-hidden">
+      <div className="w-full flex flex-col md:flex-row gap-5 items-start">
+        {/* Left: Particle Controls Deck */}
+        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -631,8 +631,10 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
           </div>
         </div>
 
-        {/* Middle: Interactive Canvas Viewport (Span 5) */}
-        <div className="order-1 lg:order-2 lg:col-span-5 flex flex-col items-center gap-3">
+        {/* Right / Main Simulator Stage */}
+        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+          {/* Middle: Interactive Canvas Viewport */}
+          <div className="w-full lg:flex-1 flex flex-col items-center gap-3">
           <div className={`w-full border rounded-2xl p-4 shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -668,8 +670,8 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
           </div>
         </div>
 
-        {/* Right: Chemical Identity & Live Specs (Span 3) */}
-        <div className="order-3 lg:order-3 lg:col-span-3 flex flex-col gap-4">
+        {/* Right: Chemical Identity & Live Specs */}
+        <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -806,6 +808,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
               <p>{getElementDescription(currentElement, lang)}</p>
             </div>
           </div>
+        </div>
         </div>
       </div>
 

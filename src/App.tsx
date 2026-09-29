@@ -37,7 +37,7 @@ function MainAppContent() {
   const isDark = theme === 'dark';
 
   return (
-    <div className={`min-h-screen flex flex-col justify-between transition-colors duration-200 ${
+    <div className={`min-h-screen flex flex-col justify-between transition-colors duration-200 overflow-x-hidden w-full ${
       isDark
         ? 'bg-slate-950 text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200'
         : 'bg-slate-50 text-slate-900 selection:bg-cyan-600/20 selection:text-cyan-800'
@@ -45,20 +45,24 @@ function MainAppContent() {
       {/* Top Header */}
       <Header onOpenGuide={() => handleOpenGuide()} />
 
-      {/* Main Simulator & Lab Stage */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 md:p-6">
-        {activeTab === 'atom-builder' && (
-          <AtomBuilder onOpenGuide={() => handleOpenGuide('atoms')} />
-        )}
-        {activeTab === 'states-of-matter' && (
-          <StatesOfMatter onOpenGuide={(cat) => handleOpenGuide(cat || 'states')} />
-        )}
-        {activeTab === 'radioactive-decay' && (
-          <RadioactiveDecay onOpenGuide={() => handleOpenGuide('decay')} />
-        )}
-        {activeTab === 'experiments-lab' && (
-          <ExperimentalLab />
-        )}
+      {/* Main Simulator & Lab Stage Responsive Container */}
+      <main className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 md:p-6 overflow-x-hidden">
+        <div className="w-full flex flex-col md:flex-row gap-4 sm:gap-6 overflow-x-hidden">
+          <div className="w-full flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden">
+            {activeTab === 'atom-builder' && (
+              <AtomBuilder onOpenGuide={() => handleOpenGuide('atoms')} />
+            )}
+            {activeTab === 'states-of-matter' && (
+              <StatesOfMatter onOpenGuide={(cat) => handleOpenGuide(cat || 'states')} />
+            )}
+            {activeTab === 'radioactive-decay' && (
+              <RadioactiveDecay onOpenGuide={() => handleOpenGuide('decay')} />
+            )}
+            {activeTab === 'experiments-lab' && (
+              <ExperimentalLab />
+            )}
+          </div>
+        </div>
       </main>
 
       {/* Footer */}

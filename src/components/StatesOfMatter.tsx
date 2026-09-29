@@ -1145,9 +1145,9 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left Column: Substance Selection & Physics Controls (Span 4) */}
-        <div className="order-3 lg:order-1 lg:col-span-4 flex flex-col gap-4">
+      <div className="w-full flex flex-col md:flex-row gap-5 items-start overflow-x-hidden">
+        {/* Left Column: Substance Selection & Physics Controls */}
+        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
           {/* Substance Selector Card (Expanded to 12 substances including Gold & Bromine!) */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
@@ -1335,8 +1335,10 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
           </div>
         </div>
 
-        {/* Middle Column: Physical Simulation Vessel & Correct Phase Gauge (Span 5) */}
-        <div className="order-1 lg:order-2 lg:col-span-5 flex flex-col items-center gap-4">
+        {/* Main Simulation Stage & Thermal Controls */}
+        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+          {/* Middle Column: Physical Simulation Vessel & Correct Phase Gauge */}
+          <div className="w-full lg:flex-1 flex flex-col items-center gap-4">
           <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -1519,8 +1521,8 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
           </div>
         </div>
 
-        {/* Right Column: Thermal & Pressure Controls + Gauges (Span 3) */}
-        <div className="order-2 lg:order-3 lg:col-span-3 flex flex-col gap-4">
+          {/* Right Column: Thermal & Pressure Controls + Gauges */}
+          <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
           {/* Direct Temperature Input & Thermal Controls Card */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
@@ -2013,6 +2015,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
               </p>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
