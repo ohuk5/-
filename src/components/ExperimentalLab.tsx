@@ -146,8 +146,52 @@ const REAGENTS: LabReagent[] = [
     type: 'solid',
     defaultColor: '#475569',
     phValue: 7.0,
-    descAr: 'جسيمات معدنية داكنة غير قابلة للذوبان، تستقر في قاع الكأس كمادة راسبة.',
-    descEn: 'Insoluble dark metal filings settling at the beaker bottom as sediment.'
+    descAr: 'جسيمات معدنية داكنة غير قابلة للذوبان، تستقر في قاع الكأس وتعمل كمحفز لتفكيك البيروكسيد.',
+    descEn: 'Insoluble dark metal filings settling at the bottom, acts as catalyst for peroxide breakdown.'
+  },
+  {
+    id: 'potassium_permanganate',
+    nameAr: 'بلورات برمنغنات البوتاسيوم',
+    nameEn: 'Potassium Permanganate',
+    formula: 'KMnO₄',
+    type: 'powder',
+    defaultColor: '#7e22ce',
+    phValue: 7.0,
+    descAr: 'مؤكسد فائق وبلورات بنفسجية ملكية تُلوّن الماء بأرجواني مهيب وتفكك ماء الأكسجين بعنف!',
+    descEn: 'Potent oxidizer with royal violet crystals coloring water deep purple and vigorously decomposing peroxide!'
+  },
+  {
+    id: 'hydrogen_peroxide',
+    nameAr: 'فوق أكسيد الهيدروجين (ماء أكسجين)',
+    nameEn: 'Hydrogen Peroxide Solution',
+    formula: 'H₂O₂ (6%)',
+    type: 'liquid',
+    defaultColor: 'rgba(224, 242, 254, 0.65)',
+    phValue: 6.2,
+    descAr: 'سائل غني بالأكسجين؛ بوجود محفز (برادة حديد أو برمنغنات) يتحلل فوراً برغوة وأكسجين O₂ وحرارة!',
+    descEn: 'Oxygen-rich fluid; with catalyst (iron or permanganate) rapidly releases O₂ foam and heat!'
+  },
+  {
+    id: 'silver_nitrate',
+    nameAr: 'محلول نترات الفضة',
+    nameEn: 'Silver Nitrate Solution',
+    formula: 'AgNO₃ (0.1M)',
+    type: 'liquid',
+    defaultColor: 'rgba(248, 250, 252, 0.7)',
+    phValue: 6.0,
+    descAr: 'كاشف الكلوريد الحساس؛ عند إضافته لمحلول يحتوي كلوريد (HCl أو CaCl₂) يكوّن راسب كلوريد الفضة الأبيض الحليبي.',
+    descEn: 'Chloride analytical reagent; precipitates dense milky white AgCl upon contact with Cl- ions.'
+  },
+  {
+    id: 'ammonia_solution',
+    nameAr: 'محلول الأمونيا (هيدروكسيد الأمونيوم)',
+    nameEn: 'Ammonia Solution',
+    formula: 'NH₄OH',
+    type: 'liquid',
+    defaultColor: 'rgba(238, 242, 255, 0.65)',
+    phValue: 11.5,
+    descAr: 'قاعدة مميزة؛ عند إضافتها لمحلول النحاس تحوّله إلى معقد النحاس الأميني الملكي ذو اللون الأزرق النيلي الساحر!',
+    descEn: 'Base reagent; reacts with copper to form the stunning deep royal navy tetraamminecopper(II) complex!'
   }
 ];
 
@@ -163,6 +207,10 @@ interface BeakerContent {
   iceCount: number;
   ironG: number;
   precipitateG: number;
+  permanganateG: number;
+  peroxideMl: number;
+  silverNitrateMl: number;
+  ammoniaMl: number;
 }
 
 export const ExperimentalLab: React.FC = () => {
@@ -193,7 +241,11 @@ export const ExperimentalLab: React.FC = () => {
     universalDrops: 0,
     iceCount: 0,
     ironG: 0,
-    precipitateG: 0
+    precipitateG: 0,
+    permanganateG: 0,
+    peroxideMl: 0,
+    silverNitrateMl: 0,
+    ammoniaMl: 0
   });
 
   // Physical State of the Liquid in Beaker
@@ -216,7 +268,14 @@ export const ExperimentalLab: React.FC = () => {
   // Total Volume calculation (ml)
   const totalVolumeMl = Math.min(
     250,
-    content.waterMl + content.acidMl + content.baseMl + content.copperSulfateMl + content.iceCount * 8
+    content.waterMl +
+      content.acidMl +
+      content.baseMl +
+      content.copperSulfateMl +
+      content.peroxideMl +
+      content.silverNitrateMl +
+      content.ammoniaMl +
+      content.iceCount * 8
   );
 
   // Total Mass calculation (grams): Beaker empty weight ~85g
@@ -227,12 +286,13 @@ export const ExperimentalLab: React.FC = () => {
     content.bakingSodaG +
     content.calciumChlorideG +
     content.ironG +
-    content.precipitateG;
+    content.precipitateG +
+    content.permanganateG;
   const displayedWeightG = Math.max(0, rawMassG - balanceTare);
 
   // Chemical Calculation: Net Acid/Base moles and pH
-  const netMolesAcid = Math.max(0, content.acidMl * 0.1 - content.baseMl * 0.1 - content.bakingSodaG * 0.012);
-  const netMolesBase = Math.max(0, content.baseMl * 0.1 - content.acidMl * 0.1);
+  const netMolesAcid = Math.max(0, content.acidMl * 0.1 - content.baseMl * 0.1 - content.ammoniaMl * 0.06 - content.bakingSodaG * 0.012);
+  const netMolesBase = Math.max(0, content.baseMl * 0.1 + content.ammoniaMl * 0.06 - content.acidMl * 0.1);
   const volLiters = Math.max(0.01, totalVolumeMl / 1000);
 
   let currentPh = 7.0;
@@ -254,6 +314,21 @@ export const ExperimentalLab: React.FC = () => {
   // Determine Appearance / Fluid Color in Beaker
   const getFluidColor = () => {
     if (totalVolumeMl <= 0) return 'transparent';
+
+    // 0. Potassium Permanganate (Royal Deep Violet/Purple)
+    if (content.permanganateG > 0) {
+      return 'rgba(126, 34, 206, 0.88)';
+    }
+
+    // 0.1 Tetraamminecopper(II) Complex (Royal Deep Navy Blue)
+    if (content.copperSulfateMl > 0 && content.ammoniaMl > 0) {
+      return 'rgba(30, 58, 138, 0.92)';
+    }
+
+    // 0.2 Silver Chloride Precipitate (Dense Milky White Suspension)
+    if (content.silverNitrateMl > 0 && (content.acidMl > 0 || content.calciumChlorideG > 0)) {
+      return 'rgba(241, 245, 249, 0.92)';
+    }
 
     // 1. Phenolphthalein indicator effect: Turns bright magenta-pink if pH > 8.2
     if (content.phenolphthaleinDrops > 0 && currentPh >= 8.2) {
@@ -343,7 +418,46 @@ export const ExperimentalLab: React.FC = () => {
         setLastActionMessage(t('أُضيفت مكعبات ثلج. انخفضت درجة حرارة الكأس نحو الصفر المئوي.', 'Added ice cubes. Beaker temperature dropped towards 0 °C.'));
       } else if (reagentId === 'iron_filings') {
         next.ironG = Math.min(30, next.ironG + 5);
-        setLastActionMessage(t('أُضيفت برادة حديد داكنة استقرت في قاع الكأس كمادة راسبة.', 'Added iron filings settling at the bottom as insoluble sediment.'));
+        if (next.peroxideMl > 0) {
+          setEffervescenceBubbles(prevB => Math.min(60, prevB + 30));
+          setCurrentTempC(prevT => Math.min(88, prevT + 18));
+          setLastActionMessage(t('تحفيز حديدي! قامت برادة الحديد بتفكيك H₂O₂ وتصاعدت فقاعات الأكسجين الساخن.', 'Iron catalysis! Iron filings rapidly catalyzed H₂O₂ into hot oxygen bubbles.'));
+        } else {
+          setLastActionMessage(t('أُضيفت برادة حديد داكنة استقرت في قاع الكأس كمادة راسبة.', 'Added iron filings settling at the bottom as insoluble sediment.'));
+        }
+      } else if (reagentId === 'potassium_permanganate') {
+        next.permanganateG = Math.min(20, next.permanganateG + (amount <= 5 ? 2 : 6));
+        if (next.peroxideMl > 0) {
+          setEffervescenceBubbles(prevB => Math.min(60, prevB + 40));
+          setCurrentTempC(prevT => Math.min(96, prevT + 35));
+          setLastActionMessage(t('تفاعل تحفيزي بركاني مهيب! برمنغنات البوتاسيوم فككت ماء الأكسجين وانطلق غاز O₂ وحرارة فائقة!', 'Violent catalytic volcano! KMnO₄ decomposed peroxide into bubbling O₂ and intense heat!'));
+        } else {
+          setLastActionMessage(t('أُضيفت بلورات برمنغنات البوتاسيوم KMnO₄ وتلوّن المحلول بالأرجواني الملكي.', 'Added royal purple potassium permanganate KMnO₄ crystals.'));
+        }
+      } else if (reagentId === 'hydrogen_peroxide') {
+        next.peroxideMl = Math.min(80, next.peroxideMl + amount);
+        if (next.permanganateG > 0 || next.ironG > 0) {
+          setEffervescenceBubbles(prevB => Math.min(60, prevB + 35));
+          setCurrentTempC(prevT => Math.min(92, prevT + 25));
+          setLastActionMessage(t('تفاعل تفكك فوري لماء الأكسجين بفعل المحفز! فقاعات غاز الأكسجين النقي وارتفاع الحرارة.', 'Immediate catalytic peroxide breakdown! Pure O₂ gas foaming and heat surge.'));
+        } else {
+          setLastActionMessage(t(`تمت إضافة ${amount} مل من فوق أكسيد الهيدروجين H₂O₂ (ماء الأكسجين).`, `Added ${amount} mL of hydrogen peroxide H₂O₂ solution.`));
+        }
+      } else if (reagentId === 'silver_nitrate') {
+        next.silverNitrateMl = Math.min(80, next.silverNitrateMl + amount);
+        if (next.acidMl > 0 || next.calciumChlorideG > 0) {
+          next.precipitateG = Math.min(30, next.precipitateG + 4.5);
+          setLastActionMessage(t('كشف إيجابي عن أيونات الكلوريد! تكوّن راسب كلوريد الفضة AgCl الأبيض الحليبي.', 'Positive chloride test! Dense milky white silver chloride AgCl precipitate formed.'));
+        } else {
+          setLastActionMessage(t(`تمت إضافة ${amount} مل من نترات الفضة AgNO₃.`, `Added ${amount} mL of silver nitrate AgNO₃.`));
+        }
+      } else if (reagentId === 'ammonia_solution') {
+        next.ammoniaMl = Math.min(80, next.ammoniaMl + amount);
+        if (next.copperSulfateMl > 0) {
+          setLastActionMessage(t('تكوّن معقد النحاس الرباعي الأميني الملكي [Cu(NH₃)₄]²⁺ بلون أزرق نيلي ساحر!', 'Formed royal dark navy tetraamminecopper(II) complex [Cu(NH₃)₄]²⁺!'));
+        } else {
+          setLastActionMessage(t(`تمت إضافة ${amount} مل من محلول الأمونيا NH₄OH (ارتفعت قلوية المحلول pH).`, `Added ${amount} mL of ammonia solution NH₄OH (pH increased).`));
+        }
       }
 
       return next;
@@ -377,7 +491,11 @@ export const ExperimentalLab: React.FC = () => {
       universalDrops: 0,
       iceCount: 0,
       ironG: 0,
-      precipitateG: 0
+      precipitateG: 0,
+      permanganateG: 0,
+      peroxideMl: 0,
+      silverNitrateMl: 0,
+      ammoniaMl: 0
     });
     setBurnerPower('off');
     setCurrentTempC(23.5);
@@ -471,6 +589,30 @@ export const ExperimentalLab: React.FC = () => {
       goalAr: 'شغّل موقد بنزن على الطاقة العالية حتى تصل الحرارة إلى 100 مئوية وتتصاعد سحب البخار الأبيض!',
       goalEn: 'Turn the Bunsen burner to High power until temperature hits 100 °C and steam clouds rise!',
       isSatisfied: (_c: BeakerContent) => burnerPower !== 'off' && currentTempC >= 99.5
+    },
+    {
+      id: 'mission_peroxide_catalysis',
+      titleAr: '🔮 بركان الأكسجين وتفكيك ماء الأكسجين الحفزي',
+      titleEn: '🔮 Catalytic Oxygen Volcano & Peroxide Breakdown',
+      goalAr: 'أضف ماء الأكسجين H₂O₂ ثم أضف بلورات برمنغنات البوتاسيوم KMnO₄ أو برادة الحديد لتشاهد تفككاً سريعاً وانطلاق فقاعات الأكسجين وحرارة دافئة!',
+      goalEn: 'Add H₂O₂ solution then add potassium permanganate KMnO₄ or iron to trigger rapid catalytic O₂ effervescence & heat!',
+      isSatisfied: (c: BeakerContent) => c.peroxideMl > 0 && (c.permanganateG > 0 || c.ironG > 0) && effervescenceBubbles > 3
+    },
+    {
+      id: 'mission_silver_chloride',
+      titleAr: '✨ كشف الكلوريد الكيميائي الدقيق براسب نترات الفضة',
+      titleEn: '✨ Qualitative Chloride Test with Silver Nitrate',
+      goalAr: 'أضف حمض HCl أو ملح CaCl₂، ثم أضف محلول نترات الفضة AgNO₃ لتشاهد تشكل راسب كلوريد الفضة AgCl الأبيض الحليبي الشهير!',
+      goalEn: 'Add dilute HCl or CaCl₂ salt, then add AgNO₃ solution to precipitate dense milky white silver chloride AgCl!',
+      isSatisfied: (c: BeakerContent) => c.silverNitrateMl > 0 && (c.acidMl > 0 || c.calciumChlorideG > 0) && c.precipitateG > 1
+    },
+    {
+      id: 'mission_copper_ammonia',
+      titleAr: '🌌 معقد النحاس الرباعي الأميني الأزرق النيلي الملكي',
+      titleEn: '🌌 Royal Navy Copper-Ammonia Complex',
+      goalAr: 'أضف كبريتات النحاس الزرقاء CuSO₄ ثم أضف محلول الأمونيا NH₄OH لتشاهد تحول اللون إلى الأزرق النيلي الساحر لمعقد النحاس الملكي!',
+      goalEn: 'Add blue CuSO₄ then add ammonia NH₄OH to watch the liquid turn into an intense deep royal navy blue complex!',
+      isSatisfied: (c: BeakerContent) => c.copperSulfateMl > 5 && c.ammoniaMl > 5
     }
   ];
 
@@ -906,7 +1048,7 @@ export const ExperimentalLab: React.FC = () => {
                 <Droplet className="w-4 h-4 text-cyan-400" />
                 <span>{t('رف المحاليل والمواد الكيميائية', 'Reagents & Chemical Shelf')}</span>
               </h3>
-              <span className="text-[11px] font-mono text-cyan-400 font-bold">10 {t('مواد آمنة', 'Safe Items')}</span>
+              <span className="text-[11px] font-mono text-cyan-400 font-bold">{REAGENTS.length} {t('مواد آمنة', 'Safe Items')}</span>
             </div>
 
             {/* Dropper / Pipette Dosage Control */}

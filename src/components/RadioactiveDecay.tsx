@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Radiation,
   Play,
@@ -60,53 +60,68 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
   const timerRef = useRef<number | null>(null);
   const activeIsotope: IsotopeInfo = ISOTOPES[selectedIsotopeId] || ISOTOPES['carbon14'];
 
+  // Keep references to prevent stale closures and duplicate cycle recordings
+  const gridCellsRef = useRef<DecayCell[]>([]);
+  const elapsedCyclesRef = useRef<number>(0);
+  gridCellsRef.current = gridCells;
+  elapsedCyclesRef.current = elapsedCycles;
+
   // Initialize or reset 100-nuclei grid
-  const initSimulation = () => {
+  const initSimulation = useCallback(() => {
     setIsPlaying(false);
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    elapsedCyclesRef.current = 0;
     setElapsedCycles(0);
     const cells: DecayCell[] = [];
     for (let i = 0; i < 100; i++) {
       cells.push({ id: i, status: 'unstable', decayCycle: null });
     }
+    gridCellsRef.current = cells;
     setGridCells(cells);
     setHistoryPoints([{ cycle: 0, count: 100 }]);
-  };
+  }, []);
 
   useEffect(() => {
     initSimulation();
-  }, [selectedIsotopeId]);
+  }, [selectedIsotopeId, initSimulation]);
 
-  // One half-life cycle step
-  const tickCycle = () => {
-    setGridCells(prev => {
-      let anyChanged = false;
-      const next = prev.map(cell => {
-        if (cell.status === 'unstable') {
-          // 50% probability of decay per half-life
-          if (Math.random() < 0.5) {
-            anyChanged = true;
-            return { ...cell, status: 'stable' as const, decayCycle: elapsedCycles + 1 };
-          }
+  // One half-life cycle step (Strictly prevents duplicate data points on the same cycle)
+  const tickCycle = useCallback(() => {
+    const currentCells = gridCellsRef.current;
+    const currentCycle = elapsedCyclesRef.current;
+    const nextCycle = currentCycle + 1;
+
+    let newUnstable = 0;
+    const nextCells = currentCells.map(cell => {
+      if (cell.status === 'unstable') {
+        // 50% probability of decay per half-life
+        if (Math.random() < 0.5) {
+          return { ...cell, status: 'stable' as const, decayCycle: nextCycle };
         }
-        return cell;
-      });
-
-      const unstableCount = next.filter(c => c.status === 'unstable').length;
-      setHistoryPoints(h => [...h, { cycle: elapsedCycles + 1, count: unstableCount }]);
-      setElapsedCycles(c => c + 1);
-
-      if (unstableCount === 0) {
-        setIsPlaying(false);
-        if (timerRef.current) clearInterval(timerRef.current);
+        newUnstable++;
       }
-
-      return next;
+      return cell;
     });
-  };
+
+    gridCellsRef.current = nextCells;
+    elapsedCyclesRef.current = nextCycle;
+
+    setGridCells(nextCells);
+    setElapsedCycles(nextCycle);
+
+    // Guaranteed deduplication: ensure exactly ONE entry exists per cycle on X-axis
+    setHistoryPoints(prev => {
+      const filtered = prev.filter(pt => pt.cycle !== nextCycle);
+      return [...filtered, { cycle: nextCycle, count: newUnstable }].sort((a, b) => a.cycle - b.cycle);
+    });
+
+    if (newUnstable === 0) {
+      setIsPlaying(false);
+    }
+  }, []);
 
   // Play/Pause interval
   useEffect(() => {
@@ -122,9 +137,12 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
     }
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [isPlaying, elapsedCycles]);
+  }, [isPlaying, tickCycle]);
 
   const unstableCount = gridCells.filter(c => c.status === 'unstable').length;
   const stableCount = 100 - unstableCount;
@@ -431,7 +449,7 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
             {/* Isotope Dropdown */}
             <div className="space-y-1.5">
               <label className="text-xs text-slate-400 font-semibold block">
-                {t('مكتبة النظائر الإشعاعية الموسعة (6 أمثلة واقعية):', 'Radioactive Isotopes Library (6 Real Examples):')}
+                {t(`مكتبة النظائر الإشعاعية الموسعة (${Object.keys(ISOTOPES).length} نظائر واقعية):`, `Radioactive Isotopes Library (${Object.keys(ISOTOPES).length} Real Isotopes):`)}
               </label>
               <select
                 value={selectedIsotopeId}
@@ -440,12 +458,11 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
                   isDark ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-300 text-slate-800'
                 }`}
               >
-                <option value="carbon14">⚛️ {t('الكربون-14 (تأريخ الحفريات، 5,730 سنة)', 'Carbon-14 (Archeology Dating, 5,730 yrs)')}</option>
-                <option value="iodine131">🩺 {t('اليود-131 (طب الغدة الدرقية، 8.02 أيام)', 'Iodine-131 (Thyroid Medicine, 8.02 days)')}</option>
-                <option value="radon222">💨 {t('الرادون-222 (غاز الصخور المشع، 3.82 أيام)', 'Radon-222 (Radioactive Rock Gas, 3.82 days)')}</option>
-                <option value="cesium137">☢️ {t('السيزيوم-137 (المفاعلات والصناعة، 30.17 سنة)', 'Cesium-137 (Reactors & Industry, 30.17 yrs)')}</option>
-                <option value="cobalt60">🔬 {t('الكوبالت-60 (التعقيم وسكين غاما، 5.27 سنة)', 'Cobalt-60 (Sterilization & Gamma, 5.27 yrs)')}</option>
-                <option value="uranium238">🌋 {t('اليورانيوم-238 (عمر الأرض، 4.468 مليار سنة)', 'Uranium-238 (Age of Earth, 4.468 B yrs)')}</option>
+                {Object.values(ISOTOPES).map(iso => (
+                  <option key={iso.id} value={iso.id}>
+                    {iso.symbol} {lang === 'ar' ? iso.name : iso.nameEn} ({lang === 'ar' ? iso.halfLifeStr : iso.halfLifeStrEn})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -670,68 +687,130 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
 
             {/* Custom SVG Exponential Decay Chart */}
             <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex flex-col items-center">
-              <svg viewBox="0 0 240 140" className="w-full h-36 overflow-visible">
-                {/* Axes */}
-                <line x1="28" y1="10" x2="28" y2="120" stroke="#334155" strokeWidth="1.5" />
-                <line x1="28" y1="120" x2="230" y2="120" stroke="#334155" strokeWidth="1.5" />
+              {(() => {
+                const maxCycles = Math.max(5, elapsedCycles);
+                const plotXStart = 40;
+                const plotXEnd = 236;
+                const plotYTop = 14;
+                const plotYBottom = 118;
+                const plotW = plotXEnd - plotXStart;
+                const plotH = plotYBottom - plotYTop;
 
-                {/* Grid horizontal ticks */}
-                <line x1="25" y1="10" x2="28" y2="10" stroke="#64748b" />
-                <text x="22" y="14" fill="#64748b" fontSize="8" textAnchor="end" fontFamily="IBM Plex Mono">100%</text>
+                // Mathematical theoretical curve: N(t) = 100 * (0.5)^t
+                const theoreticalPath = Array.from({ length: 61 }, (_, i) => {
+                  const t = (i / 60) * maxCycles;
+                  const count = 100 * Math.pow(0.5, t);
+                  const x = plotXStart + (t / maxCycles) * plotW;
+                  const y = plotYBottom - (count / 100) * plotH;
+                  return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+                }).join(' ');
 
-                <line x1="25" y1="65" x2="28" y2="65" stroke="#64748b" />
-                <text x="22" y="69" fill="#64748b" fontSize="8" textAnchor="end" fontFamily="IBM Plex Mono">50%</text>
+                // Simulated line connecting points
+                const simulationPath = historyPoints.length > 1
+                  ? historyPoints.map((pt, idx) => {
+                      const x = plotXStart + (pt.cycle / maxCycles) * plotW;
+                      const y = plotYBottom - (pt.count / 100) * plotH;
+                      return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+                    }).join(' ')
+                  : '';
 
-                <line x1="25" y1="92" x2="28" y2="92" stroke="#64748b" />
-                <text x="22" y="96" fill="#64748b" fontSize="8" textAnchor="end" fontFamily="IBM Plex Mono">25%</text>
+                return (
+                  <svg viewBox="0 0 250 145" className="w-full h-36 overflow-visible">
+                    {/* Background horizontal dashed guides */}
+                    <line x1={plotXStart} y1="14" x2={plotXEnd} y2="14" stroke="#1e293b" strokeDasharray="3 3" strokeWidth="1" />
+                    <line x1={plotXStart} y1="66" x2={plotXEnd} y2="66" stroke="#1e293b" strokeDasharray="3 3" strokeWidth="1" />
+                    <line x1={plotXStart} y1="92" x2={plotXEnd} y2="92" stroke="#1e293b" strokeDasharray="3 3" strokeWidth="1" />
 
-                {/* Theoretical Curve (Dashed blue line) */}
-                <path
-                  d="M 28 10 Q 75 75, 125 98 T 225 118"
-                  fill="none"
-                  stroke="rgba(56, 189, 248, 0.4)"
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                />
+                    {/* Axes lines */}
+                    <line x1={plotXStart} y1="10" x2={plotXStart} y2={plotYBottom} stroke="#334155" strokeWidth="1.5" />
+                    <line x1={plotXStart} y1={plotYBottom} x2={plotXEnd} y2={plotYBottom} stroke="#334155" strokeWidth="1.5" />
 
-                {/* Simulated Data Points line */}
-                {historyPoints.length > 1 && (
-                  <path
-                    d={historyPoints.map((pt, idx) => {
-                      const maxCycles = Math.max(5, elapsedCycles);
-                      const x = 28 + (pt.cycle / maxCycles) * (220 - 28);
-                      const y = 120 - (pt.count / 100) * 110;
-                      return `${idx === 0 ? 'M' : 'L'} ${x} ${y}`;
-                    }).join(' ')}
-                    fill="none"
-                    stroke="#ef4444"
-                    strokeWidth="2.5"
-                  />
-                )}
+                    {/* Y-axis Ticks & Unclipped Percentage Labels */}
+                    <line x1={plotXStart - 4} y1="14" x2={plotXStart} y2="14" stroke="#64748b" strokeWidth="1.2" />
+                    <text x={plotXStart - 6} y="17" fill="#64748b" fontSize="8" textAnchor="end" fontFamily="IBM Plex Mono, monospace" fontWeight="600">100%</text>
 
-                {/* Points markers */}
-                {historyPoints.map((pt) => {
-                  const maxCycles = Math.max(5, elapsedCycles);
-                  const x = 28 + (pt.cycle / maxCycles) * (220 - 28);
-                  const y = 120 - (pt.count / 100) * 110;
-                  return (
-                    <circle
-                      key={pt.cycle}
-                      cx={x}
-                      cy={y}
-                      r="3"
-                      fill="#ef4444"
-                      stroke="#ffffff"
-                      strokeWidth="1"
+                    <line x1={plotXStart - 4} y1="66" x2={plotXStart} y2="66" stroke="#64748b" strokeWidth="1.2" />
+                    <text x={plotXStart - 6} y="69" fill="#64748b" fontSize="8" textAnchor="end" fontFamily="IBM Plex Mono, monospace" fontWeight="600">50%</text>
+
+                    <line x1={plotXStart - 4} y1="92" x2={plotXStart} y2="92" stroke="#64748b" strokeWidth="1.2" />
+                    <text x={plotXStart - 6} y="95" fill="#64748b" fontSize="8" textAnchor="end" fontFamily="IBM Plex Mono, monospace" fontWeight="600">25%</text>
+
+                    <line x1={plotXStart - 4} y1={plotYBottom} x2={plotXStart} y2={plotYBottom} stroke="#64748b" strokeWidth="1.2" />
+                    <text x={plotXStart - 6} y={plotYBottom + 3} fill="#64748b" fontSize="8" textAnchor="end" fontFamily="IBM Plex Mono, monospace" fontWeight="600">0%</text>
+
+                    {/* X-axis Ticks & Integer Cycle Numbers */}
+                    {Array.from({ length: maxCycles + 1 }, (_, c) => {
+                      const x = plotXStart + (c / maxCycles) * plotW;
+                      return (
+                        <g key={c}>
+                          <line x1={x} y1={plotYBottom} x2={x} y2={plotYBottom + 3.5} stroke="#475569" strokeWidth="1" />
+                          <text
+                            x={x}
+                            y={plotYBottom + 13}
+                            fill="#64748b"
+                            fontSize="7.5"
+                            textAnchor="middle"
+                            fontFamily="IBM Plex Mono, monospace"
+                          >
+                            {c}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* Exact Theoretical Curve: N(t) = 100 * (0.5)^t */}
+                    <path
+                      d={theoreticalPath}
+                      fill="none"
+                      stroke="rgba(56, 189, 248, 0.75)"
+                      strokeWidth="1.75"
+                      strokeDasharray="4 3"
                     />
-                  );
-                })}
-              </svg>
 
-              <div className="w-full flex justify-between px-2 pt-1 text-[9px] text-slate-500 font-mono">
-                <span>0 {t('دورات', 'cycles')}</span>
-                <span className="text-cyan-400">--- {t('الخط النظري', 'Theory')}</span>
-                <span className="text-red-400">━ {t('المحاكاة الحية', 'Simulation')}</span>
+                    {/* Simulated Data Points line */}
+                    {simulationPath && (
+                      <path
+                        d={simulationPath}
+                        fill="none"
+                        stroke="#ef4444"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    )}
+
+                    {/* Simulated Data Points markers */}
+                    {historyPoints.map((pt) => {
+                      const x = plotXStart + (pt.cycle / maxCycles) * plotW;
+                      const y = plotYBottom - (pt.count / 100) * plotH;
+                      return (
+                        <circle
+                          key={pt.cycle}
+                          cx={x}
+                          cy={y}
+                          r="3.5"
+                          fill="#ef4444"
+                          stroke="#ffffff"
+                          strokeWidth="1.5"
+                        />
+                      );
+                    })}
+                  </svg>
+                );
+              })()}
+
+              <div className="w-full flex items-center justify-between px-2 pt-2 text-[10px] font-mono border-t border-slate-900 mt-1">
+                <span className="text-slate-400">⏱️ {t('الدورات (t)', 'Cycles (t)')}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-cyan-400 flex items-center gap-1.5">
+                    <span className="inline-block w-4 border-b-2 border-dashed border-cyan-400" />
+                    <span>{t('الخط النظري N(t)', 'Theory N(t)')}</span>
+                  </span>
+                  <span className="text-red-400 flex items-center gap-1.5 font-bold">
+                    <span className="inline-block w-3.5 h-1 bg-red-500 rounded-full" />
+                    <span>{t('المحاكاة الحية', 'Simulation')}</span>
+                  </span>
+                </div>
               </div>
             </div>
 

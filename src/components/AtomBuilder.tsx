@@ -579,13 +579,19 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                 <option value="Al">²⁷Al {t('الألومنيوم', 'Aluminum')}</option>
                 <option value="Si">²⁸Si {t('السيليكون', 'Silicon')}</option>
                 <option value="Cl">³⁵Cl {t('الكلور', 'Chlorine')}</option>
+                <option value="Ti">⁴⁸Ti {t('التيتانيوم', 'Titanium')}</option>
                 <option value="Fe">⁵⁶Fe {t('الحديد', 'Iron')}</option>
                 <option value="Cu">⁶⁴Cu {t('النحاس', 'Copper')}</option>
+                <option value="Ga">⁷⁰Ga {t('الغاليوم', 'Gallium')}</option>
                 <option value="Ag">¹⁰⁸Ag {t('الفضة', 'Silver')}</option>
+                <option value="Xe">¹³¹Xe {t('الزينون', 'Xenon')}</option>
                 <option value="I">¹²⁷I {t('اليود', 'Iodine')}</option>
                 <option value="Au">¹⁹⁷Au {t('الذهب', 'Gold')}</option>
                 <option value="Pb">²⁰⁸Pb {t('الرصاص', 'Lead')}</option>
+                <option value="Po">²¹⁰Po {t('البولونيوم', 'Polonium')}</option>
+                <option value="Th">²³²Th {t('الثوريوم', 'Thorium')}</option>
                 <option value="U">²³⁸U {t('اليورانيوم', 'Uranium')}</option>
+                <option value="Pu">²³⁹Pu {t('البلوتونيوم', 'Plutonium')}</option>
                 <option value="Og">²⁹⁴Og {t('الأوغانيسون (118)', 'Oganesson (118)')}</option>
               </select>
             </div>

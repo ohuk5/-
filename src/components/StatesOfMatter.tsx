@@ -1155,7 +1155,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
             <h3 className={`font-bold text-base pb-2 border-b flex items-center justify-between ${
               isDark ? 'text-slate-200 border-slate-800' : 'text-slate-800 border-slate-200'
             }`}>
-              <span>{t('المادة الكيميائية (12 عنصراً ومركباً)', 'Chemical Substance (12 Models)')}</span>
+              <span>{t(`المادة الكيميائية (${Object.keys(SUBSTANCES).length} عنصراً ومركباً)`, `Chemical Substance (${Object.keys(SUBSTANCES).length} Models)`)}</span>
               <span className="text-xs font-mono text-cyan-400 font-bold">{substance.formula}</span>
             </h3>
 

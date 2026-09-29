@@ -198,6 +198,81 @@ export const SUBSTANCES: Record<string, SubstanceInfo> = {
     descEn: 'The only non-metallic element that is liquid at standard room temperature. A heavy, volatile reddish-brown halogen boiling at only 58.8 °C.',
     defaultTempK: 295,
     mass: 159.808
+  },
+  gallium: {
+    id: 'gallium',
+    name: 'الغاليوم',
+    nameEn: 'Gallium',
+    formula: 'Ga',
+    meltingPointK: 302.91, // 29.76 °C (Melts in hand!)
+    boilingPointK: 2673, // 2400 °C
+    particleType: 'metallic',
+    color: '#38bdf8',
+    themeColor: 'sky',
+    desc: 'معدن عجيب ينصهر في راحة يدك (29.8 °C) ولكنه يغلي عند 2673 K! يمتلك أوسع نطاق سائل بين جميع العناصر في الجدول الدوري.',
+    descEn: 'Miracle metal that melts in human hand (29.8 °C) yet boils at an extreme 2673 K, offering the widest liquid temperature range in the periodic table.',
+    defaultTempK: 295,
+    mass: 69.723
+  },
+  ethanol: {
+    id: 'ethanol',
+    name: 'الإيثانول',
+    nameEn: 'Ethanol',
+    formula: 'C₂H₅OH',
+    meltingPointK: 159.05, // -114.1 °C
+    boilingPointK: 351.44, // 78.29 °C
+    particleType: 'water',
+    color: '#06b6d4',
+    themeColor: 'cyan',
+    desc: 'كحول متطاير ومذيب كيميائي شائع، درجة غليانه 78.3 °C (أقل من الماء)، روابطه الهيدروجينية تجعله يتبخر سريعاً ويمتص الحرارة.',
+    descEn: 'Volatile alcohol and ubiquitous solvent. Boils at 78.3 °C (below water) with rapid evaporative cooling.',
+    defaultTempK: 298,
+    mass: 46.068
+  },
+  xenon: {
+    id: 'xenon',
+    name: 'الزينون',
+    nameEn: 'Xenon',
+    formula: 'Xe',
+    meltingPointK: 161.4, // -111.75 °C
+    boilingPointK: 165.03, // -108.12 °C
+    particleType: 'monatomic',
+    color: '#818cf8',
+    themeColor: 'indigo',
+    desc: 'أثقل الغازات النبيلة المستقرة، غاز فائق الكثافة (أكثف من الهواء بخمس مرات)، وقود محركات الدفع الأيوني في مسابير الفضاء العميقة.',
+    descEn: 'Heaviest stable noble gas, five times denser than air, utilized as propellant in deep-space ion propulsion thrusters.',
+    defaultTempK: 180,
+    mass: 131.293
+  },
+  copper: {
+    id: 'copper',
+    name: 'النحاس',
+    nameEn: 'Copper',
+    formula: 'Cu',
+    meltingPointK: 1357.77, // 1084.62 °C
+    boilingPointK: 2835, // 2562 °C
+    particleType: 'metallic',
+    color: '#ea580c',
+    themeColor: 'amber',
+    desc: 'فلز أحمر مميز فائق التوصيل للكهرباء والحرارة، شبكته البلورية المتماسكة تنصهر عند 1358 K متحولة لحمم متوهجة ثم بخار عند 2835 K.',
+    descEn: 'Luminous reddish metal with superlative electrical & thermal conductivity, melting into molten magma at 1358 K.',
+    defaultTempK: 300,
+    mass: 63.546
+  },
+  titanium: {
+    id: 'titanium',
+    name: 'التيتانيوم',
+    nameEn: 'Titanium',
+    formula: 'Ti',
+    meltingPointK: 1941, // 1668 °C
+    boilingPointK: 3560, // 3287 °C
+    particleType: 'metallic',
+    color: '#94a3b8',
+    themeColor: 'slate',
+    desc: 'معدن صناعات الفضاء والصواريخ الفائقة، خفيف وقوي كالصلب ومقاوم للتآكل، نقطة انصهاره 1941 K ويغلي عند حرارة جهنمية 3560 K.',
+    descEn: 'Aerospace super-metal combining high tensile strength, low density, and extreme corrosion resistance; melts at 1941 K and boils at 3560 K.',
+    defaultTempK: 300,
+    mass: 47.867
   }
 };
 

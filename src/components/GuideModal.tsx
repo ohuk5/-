@@ -485,6 +485,52 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Exotic Substances Showcase */}
+              <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                <h4 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  <span>{t('معرض المواد وظواهرها الفيزيائية الخارقة في المحاكي:', 'Exotic Substances Showcase in the Simulator:')}</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs text-slate-300">
+                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="font-bold text-sky-400 block mb-1">🌡️ {t('الغاليوم (Ga):', 'Gallium (Ga):')}</span>
+                    <p className="text-slate-400 leading-relaxed">
+                      {t('معدن ينصهر في راحة يدك عند 29.8 °C، ولكنه يغلي عند 2400 °C! أوسع نطاق حراري سائل في الكون.', 'Melts in your palm at 29.8 °C but boils at 2400 °C! Widest liquid range in the universe.')}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="font-bold text-slate-300 block mb-1">🚀 {t('التيتانيوم (Ti):', 'Titanium (Ti):')}</span>
+                    <p className="text-slate-400 leading-relaxed">
+                      {t('معدن الصواريخ الفائقة؛ ينصهر عند 1941 K ويغلي عند 3560 K، صلب كالصلب ونصف وزنه ومقاوم لكل العوامل.', 'Aerospace metal; melts at 1941 K and boils at 3560 K, high tensile strength and ultralight.')}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="font-bold text-indigo-400 block mb-1">⚡ {t('الزينون (Xe):', 'Xenon (Xe):')}</span>
+                    <p className="text-slate-400 leading-relaxed">
+                      {t('أثقل الغازات النبيلة المستقرة، أثقل من الهواء بخمس مرات، وقود الدفع الأيوني لمسبارات الفضاء السحيق.', 'Heaviest noble gas, 5x denser than air, propellant for deep-space ion propulsion thrusters.')}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="font-bold text-cyan-400 block mb-1">🧪 {t('الإيثانول (C₂H₅OH):', 'Ethanol (C₂H₅OH):')}</span>
+                    <p className="text-slate-400 leading-relaxed">
+                      {t('كحول طيار يغلي عند 78.3 °C ويمتص حرارة هائلة أثناء التبخر، مما يفسر إحساس البرودة عند وضعه على الجلد.', 'Volatile alcohol boiling at 78.3 °C with strong evaporative cooling on contact with skin.')}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="font-bold text-amber-500 block mb-1">👑 {t('الذهب (Au):', 'Gold (Au):')}</span>
+                    <p className="text-slate-400 leading-relaxed">
+                      {t('فلز نبيل فائق الكثافة والبريق، لا يتأكسد ولا يصدأ، ينصهر عند 1337 K بحمم ذهبية متوهجة نقية.', 'Noble dense metal that never tarnishes, melting at 1337 K into glowing golden liquid magma.')}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <span className="font-bold text-yellow-400 block mb-1">❄️ {t('الهيليوم (He):', 'Helium (He):')}</span>
+                    <p className="text-slate-400 leading-relaxed">
+                      {t('أقل نقطة غليان في الكون (4.2 K)، لا يتجمد حتى عند الصفر المطلق تحت الضغط الجوي العادي!', 'Lowest boiling point in existence (4.2 K); never freezes at 1 atm even at absolute zero!')}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -649,6 +695,58 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                     )}
                   </p>
                 </div>
+
+                <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <span className="font-bold text-amber-400 text-xs flex items-center gap-1.5">
+                    <span>🚀</span>
+                    <span>{t('البولونيوم-210 (عمر النصف: 138.4 يوماً):', 'Polonium-210 (Space RTG Power):')}</span>
+                  </span>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {t(
+                      'باعث ألفا مكثف جداً اكتشفته ماري كوري. يُولّد جرام واحد منه 140 واط من الحرارة الذاتية، ويستخدم لتوليد الكهرباء في مركبات الفضاء ومسبارات الكواكب.',
+                      'Intense alpha emitter discovered by Marie Curie; 1 gram yields 140 W of thermal heat, powering thermoelectric generators in deep space probes.'
+                    )}
+                  </p>
+                </div>
+
+                <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <span className="font-bold text-teal-400 text-xs flex items-center gap-1.5">
+                    <span>🌱</span>
+                    <span>{t('الثوريوم-232 (عمر النصف: 14.05 مليار سنة):', 'Thorium-232 (Green Nuclear Fuel):')}</span>
+                  </span>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {t(
+                      'وقود المفاعلات النووية الخضراء للمستقبل. عمر نصفه يفوق عمر الكون المعروف (13.8 مليار سنة)، ويتميز باستحالة الانصهار النووي وإنتاجه نفايات آمنة.',
+                      'Green nuclear fuel with a half-life exceeding the age of the universe (14.05 billion years), powering walk-away safe Molten Salt Reactors.'
+                    )}
+                  </p>
+                </div>
+
+                <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <span className="font-bold text-purple-400 text-xs flex items-center gap-1.5">
+                    <span>🩺</span>
+                    <span>{t('التكنيشيوم-99m (عمر النصف: 6.01 ساعات):', 'Technetium-99m (Diagnostic Scan King):')}</span>
+                  </span>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {t(
+                      'النظير الطبي الأكثر استخداماً في العالم (85% من الفحوصات). باعث غاما نقي دون جسيمات مؤذية، ويختفي إشعاعه من جسم المريض خلال يوم واحد.',
+                      'The gold standard in diagnostic medical imaging (85% of scans worldwide). Emits pure 140 keV gamma with a 6-hour half-life for safe diagnosis.'
+                    )}
+                  </p>
+                </div>
+
+                <div className={`p-4 rounded-2xl border space-y-2 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <span className="font-bold text-red-400 text-xs flex items-center gap-1.5">
+                    <span>⚡</span>
+                    <span>{t('البلوتونيوم-239 (عمر النصف: 24,110 سنة):', 'Plutonium-239 (Fission Energy):')}</span>
+                  </span>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {t(
+                      'نظير انشطاري فائق الكثافة الطاقية يُستخدم في مفاعلات التوليد السريعة، ينتج طاقة كهربائية تفوق احتراق أطنان الفحم بملايين المرات.',
+                      'Key fissile transuranic isotope for fast breeder power reactors, generating millions of times more electrical energy per mass than fossil fuels.'
+                    )}
+                  </p>
+                </div>
               </div>
 
               {/* Decay Formula Explained */}
@@ -753,6 +851,60 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                       {t(
                         'انتقل إلى قسم بناء الذرة، وضع 7 بروتونات و 7 نيوترونات و 7 إلكترونات لبناء ذرة النيتروجين المستقرة. ثم جرّب إزالة كل النيوترونات وشاهد كيف تضطرب النواة ويحذرك المحاكي!',
                         'Switch to Atom Builder, assemble 7 protons, 7 neutrons, and 7 electrons for stable Nitrogen-14. Then remove neutrons to watch the nucleus vibrate under radioactive instability!'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mission 5: Peroxide Oxygen Volcano */}
+                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-8 h-8 rounded-xl bg-pink-950 border border-pink-500/50 flex items-center justify-center text-pink-300 font-black shrink-0 text-sm">
+                    5
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-bold text-sm text-pink-400">
+                      {t('تحدي بركان الأكسجين ومعجون الفيل (H₂O₂ + المحفز)', 'Challenge: Oxygen Volcano & Elephant Toothpaste (H₂O₂ Catalysis)')}
+                    </h5>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {t(
+                        'في معمل التجارب: أضف 15 مل من ماء الأكسجين H₂O₂، ثم أضف بلورات برمنغنات البوتاسيوم KMnO₄ أو برادة الحديد Fe. الملاحظة: يحدث تفكك حفزي عنيف يطلق فقاعات غاز الأكسجين O₂ الصافي ويرفع الحرارة فورياً لأكثر من 65°C!',
+                        'In Experimental Lab: Add 15 mL H₂O₂, then add KMnO₄ crystals or Fe iron filings. Observation: Instant catalytic decomposition furiously releases pure O₂ bubbles and drives temperature past 65°C!'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mission 6: Silver Chloride Precipitation */}
+                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center text-white font-black shrink-0 text-sm">
+                    6
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-bold text-sm text-slate-200">
+                      {t('تحدي كشف الكلوريد الكيميائي بنترات الفضة (AgCl)', 'Challenge: Qualitative Chloride Test (AgNO₃ + Cl⁻)')}
+                    </h5>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {t(
+                        'في معمل التجارب: ضع حمض الهيدروكلوريك HCl أو ملح CaCl₂، ثم اسكب قطرات من نترات الفضة AgNO₃. الملاحظة: يتكون فوراً راسب كلوريد الفضة الأبيض الحليبي الشهير غير القابل للذوبان في الماء!',
+                        'In Experimental Lab: Add dilute HCl or CaCl₂, then pour drops of AgNO₃ silver nitrate. Observation: Dense milky white insoluble AgCl precipitate forms instantly!'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mission 7: Royal Navy Copper-Ammonia Complex */}
+                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-8 h-8 rounded-xl bg-blue-950 border border-blue-500/50 flex items-center justify-center text-blue-300 font-black shrink-0 text-sm">
+                    7
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-bold text-sm text-blue-400">
+                      {t('تحدي معقد النحاس الأمينياتي الأزرق النيلي الملكي', 'Challenge: Royal Navy Tetraamminecopper(II) Complex')}
+                    </h5>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {t(
+                        'في معمل التجارب: أضف كبريتات النحاس الزرقاء CuSO₄ ثم أضف محلول الأمونيا NH₄OH. الملاحظة: يتحول اللون السماوي فورياً إلى أزرق نيلي داكن ملكي ساحر لتشكل معقد التناسق [Cu(NH₃)₄]²⁺!',
+                        'In Experimental Lab: Add blue CuSO₄ solution then add ammonia NH₄OH. Observation: The sky-blue fluid dramatically transforms into an intense, deep royal navy coordination complex [Cu(NH₃)₄]²⁺!'
                       )}
                     </p>
                   </div>

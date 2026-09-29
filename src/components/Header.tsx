@@ -74,59 +74,74 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
           </div>
         </div>
 
-        {/* Navigation Tabs (4 Comprehensive Tabs) */}
-        <div className="flex items-center gap-1.5 w-full lg:w-auto justify-start sm:justify-center overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
-          <div className={`flex rounded-2xl p-1 border text-[11px] sm:text-xs md:text-sm max-w-full ${
-            isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-          }`}>
+        {/* Navigation Tabs (Responsive & Touch-Optimized) */}
+        <div className="w-full lg:w-auto flex items-center justify-center">
+          <nav
+            aria-label="App Navigation"
+            className={`w-full sm:w-auto grid grid-cols-4 sm:flex items-center gap-1 p-1 rounded-2xl border ${
+              isDark ? 'bg-slate-900/95 border-slate-800 shadow-inner shadow-black/40' : 'bg-slate-100/90 border-slate-200 shadow-inner'
+            }`}
+          >
             <button
               onClick={() => setActiveTab('atom-builder')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all text-[11px] sm:text-xs md:text-sm ${
                 activeTab === 'atom-builder'
-                  ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/30'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Atom className="w-3.5 h-3.5" />
-              <span>{t('بناء الذرة (1-118)', 'Atom Builder')}</span>
+              <Atom className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                <span className="inline sm:hidden">{t('الذرات', 'Atoms')}</span>
+                <span className="hidden sm:inline">{t('بناء الذرة (1-118)', 'Atom Builder (1-118)')}</span>
+              </span>
             </button>
 
             <button
               onClick={() => setActiveTab('states-of-matter')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all text-[11px] sm:text-xs md:text-sm ${
                 activeTab === 'states-of-matter'
-                  ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/30'
+                  ? 'bg-orange-600 text-white shadow-md shadow-orange-600/30'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Flame className="w-3.5 h-3.5" />
-              <span>{t('حالات المادة والحرارة', 'States of Matter')}</span>
+              <Flame className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                <span className="inline sm:hidden">{t('الحالات', 'States')}</span>
+                <span className="hidden sm:inline">{t('حالات المادة والحرارة', 'States of Matter')}</span>
+              </span>
             </button>
 
             <button
               onClick={() => setActiveTab('radioactive-decay')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all text-[11px] sm:text-xs md:text-sm ${
                 activeTab === 'radioactive-decay'
-                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/30'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Radiation className="w-3.5 h-3.5" />
-              <span>{t('عمر النصف والنشاط', 'Radioactive Decay')}</span>
+              <Radiation className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                <span className="inline sm:hidden">{t('النشاط', 'Decay')}</span>
+                <span className="hidden sm:inline">{t('عمر النصف والنشاط', 'Radioactive Decay')}</span>
+              </span>
             </button>
 
             <button
               onClick={() => setActiveTab('experiments-lab')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all text-[11px] sm:text-xs md:text-sm ${
                 activeTab === 'experiments-lab'
-                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30 ring-1 ring-indigo-400'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-1 ring-indigo-400/50'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <FlaskConical className="w-3.5 h-3.5 text-indigo-400" />
-              <span>{t('معمل التجارب 🔬', 'Experimental Lab 🔬')}</span>
+              <FlaskConical className="w-4 h-4 shrink-0 text-indigo-400" />
+              <span className="truncate">
+                <span className="inline sm:hidden">{t('المعمل', 'Lab')}</span>
+                <span className="hidden sm:inline">{t('معمل التجارب 🔬', 'Experimental Lab 🔬')}</span>
+              </span>
             </button>
-          </div>
+          </nav>
 
           {/* Desktop Controls: Theme, Language, Guide */}
           <div className="hidden lg:flex items-center gap-1.5">
