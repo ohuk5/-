@@ -75,13 +75,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
         </div>
 
         {/* Navigation Tabs (4 Comprehensive Tabs) */}
-        <div className="flex items-center gap-2 w-full lg:w-auto justify-center overflow-x-auto pb-1 lg:pb-0 no-scrollbar">
-          <div className={`flex rounded-2xl p-1 border text-xs sm:text-sm ${
+        <div className="flex items-center gap-1.5 w-full lg:w-auto justify-start sm:justify-center overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
+          <div className={`flex rounded-2xl p-1 border text-[11px] sm:text-xs md:text-sm max-w-full ${
             isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
           }`}>
             <button
               onClick={() => setActiveTab('atom-builder')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
                 activeTab === 'atom-builder'
                   ? 'bg-cyan-600 text-white shadow-sm shadow-cyan-500/30'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
@@ -93,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
 
             <button
               onClick={() => setActiveTab('states-of-matter')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
                 activeTab === 'states-of-matter'
                   ? 'bg-orange-600 text-white shadow-sm shadow-orange-500/30'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
 
             <button
               onClick={() => setActiveTab('radioactive-decay')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
                 activeTab === 'radioactive-decay'
                   ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/30'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
@@ -117,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
 
             <button
               onClick={() => setActiveTab('experiments-lab')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap ${
                 activeTab === 'experiments-lab'
                   ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30 ring-1 ring-indigo-400'
                   : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'

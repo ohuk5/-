@@ -401,7 +401,7 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Isotope Selector & Nuclear Specs (Span 4) */}
-        <div className="lg:col-span-4 flex flex-col gap-4">
+        <div className="order-2 lg:order-1 lg:col-span-4 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>

@@ -375,7 +375,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Particle Controls Deck (Span 4) */}
-        <div className="lg:col-span-4 flex flex-col gap-4">
+        <div className="order-2 lg:order-1 lg:col-span-4 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -632,7 +632,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         </div>
 
         {/* Middle: Interactive Canvas Viewport (Span 5) */}
-        <div className="lg:col-span-5 flex flex-col items-center gap-3">
+        <div className="order-1 lg:order-2 lg:col-span-5 flex flex-col items-center gap-3">
           <div className={`w-full border rounded-2xl p-4 shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -646,7 +646,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             </div>
 
             {/* Canvas Box */}
-            <div className="relative w-full aspect-square max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+            <div className="relative w-full aspect-square max-w-[340px] sm:max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
               <canvas
                 ref={canvasRef}
                 width={420}
@@ -669,7 +669,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         </div>
 
         {/* Right: Chemical Identity & Live Specs (Span 3) */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
+        <div className="order-3 lg:order-3 lg:col-span-3 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>

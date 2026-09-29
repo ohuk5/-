@@ -913,6 +913,43 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
     setIsDraggingPiston(false);
   };
 
+  // Touch handlers for mobile devices
+  const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || e.touches.length === 0) return;
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const clickY = touch.clientY - rect.top;
+    const h = canvas.height;
+    const scaleY = h / rect.height;
+    const internalY = clickY * scaleY;
+    const currentLidY = 40 + ((100 - volumeLidPercent) * (h - 100)) / 100;
+
+    if (Math.abs(internalY - currentLidY) < 50 || internalY < currentLidY) {
+      setIsDraggingPiston(true);
+    }
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDraggingPiston) return;
+    const canvas = canvasRef.current;
+    if (!canvas || e.touches.length === 0) return;
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const currentY = touch.clientY - rect.top;
+    const h = canvas.height;
+    const scaleY = h / rect.height;
+    const internalY = currentY * scaleY;
+
+    const clampedY = Math.max(40, Math.min(h - 60, internalY));
+    const newVol = Math.round(100 - ((clampedY - 40) / (h - 100)) * 100);
+    applyAdiabaticVolumeChange(Math.max(25, Math.min(100, newVol)));
+  };
+
+  const handleCanvasTouchEnd = () => {
+    setIsDraggingPiston(false);
+  };
+
   const runExperiment = (exp: 'space_drop' | 'pressure_cooker' | 'co2_sublime' | 'mercury_liquid' | 'gold_melt' | 'bromine_vapor') => {
     if (exp === 'space_drop') {
       setSubstanceId('water');
@@ -1110,7 +1147,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left Column: Substance Selection & Physics Controls (Span 4) */}
-        <div className="lg:col-span-4 flex flex-col gap-4">
+        <div className="order-3 lg:order-1 lg:col-span-4 flex flex-col gap-4">
           {/* Substance Selector Card (Expanded to 12 substances including Gold & Bromine!) */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
@@ -1299,7 +1336,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         </div>
 
         {/* Middle Column: Physical Simulation Vessel & Correct Phase Gauge (Span 5) */}
-        <div className="lg:col-span-5 flex flex-col items-center gap-4">
+        <div className="order-1 lg:order-2 lg:col-span-5 flex flex-col items-center gap-4">
           <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -1336,10 +1373,46 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
-                className="w-full h-full relative z-10 cursor-ns-resize"
+                onTouchStart={handleCanvasTouchStart}
+                onTouchMove={handleCanvasTouchMove}
+                onTouchEnd={handleCanvasTouchEnd}
+                className="w-full h-full relative z-10 cursor-ns-resize touch-none select-none"
               />
-              <div className="absolute top-2 left-2 z-20 pointer-events-none text-[10px] text-slate-400 bg-slate-900/80 px-2 py-1 rounded border border-slate-800">
-                {t('↕ اسحب المكبس بالماوس لتغيير الحجم والضغط', '↕ Drag piston to change volume & pressure')}
+              <div className="absolute top-2 left-2 z-20 pointer-events-none text-[10px] text-slate-300 bg-slate-900/80 px-2 py-1 rounded border border-slate-800 flex items-center gap-1">
+                <span>↕</span>
+                <span>{t('اسحب المكبس باللمس أو الماوس', 'Drag piston by touch or mouse')}</span>
+              </div>
+            </div>
+
+            {/* Direct Piston Controls (For Mobile & Precision) */}
+            <div className={`w-full mt-3 p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
+              isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-400">{t('المكبس والحجم:', 'Piston & Volume:')}</span>
+                <span className="text-xs font-mono font-black text-cyan-400">{volumeLidPercent}%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => applyAdiabaticVolumeChange(Math.max(25, volumeLidPercent - 15))}
+                  disabled={volumeLidPercent <= 25}
+                  className="px-2.5 py-1 rounded-lg bg-orange-950/80 hover:bg-orange-900/80 border border-orange-700/60 text-orange-200 text-xs font-bold disabled:opacity-40 transition-all flex items-center gap-1 shadow-xs active:scale-95"
+                  title={t('كبس المكبس للأسفل (رفع الضغط)', 'Compress Piston Down (Raise Pressure)')}
+                >
+                  <span>⬇</span>
+                  <span className="text-[11px]">{t('كبس المكبس', 'Compress')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyAdiabaticVolumeChange(Math.min(100, volumeLidPercent + 15))}
+                  disabled={volumeLidPercent >= 100}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-700/60 text-cyan-200 text-xs font-bold disabled:opacity-40 transition-all flex items-center gap-1 shadow-xs active:scale-95"
+                  title={t('رفع المكبس للأعلى (تخفيف الضغط)', 'Raise Piston Up (Reduce Pressure)')}
+                >
+                  <span>⬆</span>
+                  <span className="text-[11px]">{t('رفع المكبس', 'Expand')}</span>
+                </button>
               </div>
             </div>
 
@@ -1447,7 +1520,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         </div>
 
         {/* Right Column: Thermal & Pressure Controls + Gauges (Span 3) */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
+        <div className="order-2 lg:order-3 lg:col-span-3 flex flex-col gap-4">
           {/* Direct Temperature Input & Thermal Controls Card */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'

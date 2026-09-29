@@ -45,6 +45,7 @@ export const PeriodicTableModal: React.FC<PeriodicTableModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [hoveredElement, setHoveredElement] = useState<ElementInfo | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
 
   const elementsMap = useMemo(() => {
     const map = new Map<number, ElementInfo>();
@@ -128,8 +129,38 @@ export const PeriodicTableModal: React.FC<PeriodicTableModalProps> = ({
             )}
           </div>
 
-          {/* Category Filter Pills */}
+          {/* Category Filter Pills & View Mode */}
           <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 text-xs">
+            {/* View Mode Toggle (Table / Cards for Mobile) */}
+            <div className="flex items-center rounded-xl border border-slate-700/60 p-0.5 text-xs font-bold shrink-0 bg-slate-900/60 mr-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  viewMode === 'table'
+                    ? 'bg-cyan-600 text-white shadow-xs'
+                    : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title={t('جدول دوري (18 مجموعة)', 'Periodic Table Grid')}
+              >
+                <span>⊞</span>
+                <span className="text-[11px]">{t('جدول', 'Table')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={`px-2 py-1 rounded-lg transition-all flex items-center gap-1 ${
+                  viewMode === 'cards'
+                    ? 'bg-cyan-600 text-white shadow-xs'
+                    : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title={t('بطاقات عناصر للموبايل', 'Responsive Cards View')}
+              >
+                <span>▦</span>
+                <span className="text-[11px]">{t('بطاقات', 'Cards')}</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setSelectedCategory('all')}
               className={`px-2.5 py-1.5 rounded-lg font-medium transition-all shrink-0 ${
@@ -157,9 +188,54 @@ export const PeriodicTableModal: React.FC<PeriodicTableModalProps> = ({
         </div>
 
         {/* Periodic Grid Container */}
-        <div className="flex-1 overflow-auto p-4 space-y-4">
-          {/* Main 7 Periods Grid */}
-          <div className="min-w-[860px]">
+        <div className="flex-1 overflow-auto p-3 sm:p-4 space-y-4">
+          {viewMode === 'cards' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+              {filteredElements.map((el) => {
+                const isSelected = el.atomicNumber === currentAtomicNumber;
+                const colors = CATEGORY_COLORS[el.category] || CATEGORY_COLORS['nonmetal'];
+                return (
+                  <button
+                    key={el.atomicNumber}
+                    onClick={() => {
+                      onSelectElement(el);
+                      onClose();
+                    }}
+                    onMouseEnter={() => setHoveredElement(el)}
+                    onMouseLeave={() => setHoveredElement(null)}
+                    className={`p-3 rounded-xl border flex flex-col justify-between text-start transition-all active:scale-95 ${
+                      colors.border
+                    } ${isSelected ? 'ring-2 ring-cyan-400 shadow-md scale-[1.02]' : ''} ${
+                      colors.bg
+                    } hover:shadow-lg`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="font-mono text-xs font-bold text-slate-400">#{el.atomicNumber}</span>
+                      {el.isRadioactive && <span className="text-amber-400 text-xs" title="عنصر مشع">☢</span>}
+                    </div>
+                    <div className="my-1.5 flex items-baseline gap-2">
+                      <span className="text-xl font-black text-white">{el.symbol}</span>
+                      <span className="text-xs font-bold text-slate-200 truncate">{t(el.name, el.englishName)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-700/40">
+                      <span>{el.atomicMass.toFixed(1)} u</span>
+                      <span className="truncate max-w-[80px]">{t(CATEGORY_COLORS[el.category]?.badge || '', el.category)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {/* Mobile Swipe Hint */}
+              <div className="sm:hidden text-center py-1.5 px-3 bg-cyan-950/60 border border-cyan-800/40 rounded-xl text-[11px] text-cyan-300 font-medium flex items-center justify-between">
+                <span>👉</span>
+                <span>{t('اسحب أفقياً لتصفح الجدول أو حوّل لـ (بطاقات ▦)', 'Swipe table or toggle (Cards ▦)')}</span>
+                <span>👈</span>
+              </div>
+
+              {/* Main 7 Periods Grid */}
+              <div className="min-w-[860px]">
             <div className="grid grid-cols-18 gap-1.5 text-center" style={{ gridTemplateColumns: 'repeat(18, minmax(0, 1fr))' }}>
               {PERIODIC_GRID_MAIN.map((row, rIdx) =>
                 row.map((zNum, cIdx) => {
@@ -306,6 +382,8 @@ export const PeriodicTableModal: React.FC<PeriodicTableModalProps> = ({
               </div>
             </div>
           </div>
+          </>
+          )}
         </div>
 
         {/* Preview Footer Strip */}
