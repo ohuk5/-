@@ -12,7 +12,9 @@ import {
   BookOpen
 } from 'lucide-react';
 import { ALL_ELEMENTS, ELEMENT_MAP, ElementInfo, CATEGORY_COLORS } from '../data/elementsData';
+import { getElementDescription } from '../data/elementDescriptionsEn';
 import { PeriodicTableModal } from './PeriodicTableModal';
+import { useApp } from '../context/AppContext';
 
 interface NucleusNode {
   x: number;
@@ -28,6 +30,8 @@ interface AtomBuilderProps {
 }
 
 export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
+  const { lang, theme, t } = useApp();
+  const isDark = theme === 'dark';
   const [protons, setProtons] = useState<number>(1);
   const [neutrons, setNeutrons] = useState<number>(0);
   const [electrons, setElectrons] = useState<number>(1);
@@ -372,20 +376,26 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Particle Controls Deck (Span 4) */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 gap-2 flex-wrap">
-              <h3 className="font-bold text-slate-200 text-base flex items-center gap-2">
-                <span>التحكم بالجسيمات</span>
+          <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div className={`flex items-center justify-between pb-3 border-b gap-2 flex-wrap ${
+              isDark ? 'border-slate-800' : 'border-slate-200'
+            }`}>
+              <h3 className={`font-bold text-base flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
+                <span>{t('التحكم بالجسيمات', 'Particle Controls')}</span>
               </h3>
               <div className="flex items-center gap-1.5">
                 {onOpenGuide && (
                   <button
                     onClick={onOpenGuide}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-all"
-                    title="شرح بناء الذرة والجسيمات"
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                    }`}
+                    title={t('شرح بناء الذرة والجسيمات', 'Atom & particle guide')}
                   >
                     <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>دليل الذرة</span>
+                    <span>{t('دليل الذرة', 'Guide')}</span>
                   </button>
                 )}
                 <button
@@ -393,37 +403,43 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-700/60 text-cyan-300 text-xs font-semibold transition-all shadow-sm"
                 >
                   <Table className="w-3.5 h-3.5" />
-                  <span>الجدول الدوري (118)</span>
+                  <span>{t('الجدول الدوري (118)', 'Periodic Table (118)')}</span>
                 </button>
               </div>
             </div>
 
             {/* Protons Control (p+) */}
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-red-950/40 space-y-2">
+            <div className={`p-3 rounded-xl border border-red-950/40 space-y-2 ${
+              isDark ? 'bg-slate-950/60' : 'bg-red-50/50 border-red-200'
+            }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-red-950/60 border border-red-500/50 flex items-center justify-center text-red-400 font-bold text-xs">
                     p⁺
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-red-400">البروتونات (Z)</h4>
-                    <p className="text-[10px] text-slate-400">تحدد هوية العنصر الكيميائي</p>
+                    <h4 className="text-xs font-bold text-red-500">{t('البروتونات (Z)', 'Protons (Z)')}</h4>
+                    <p className="text-[10px] text-slate-400">{t('تحدد هوية العنصر الكيميائي', 'Determines element chemical identity')}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setProtons(p => Math.max(0, p - 1))}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center transition-all"
+                    className={`w-7 h-7 rounded-lg font-bold text-sm flex items-center justify-center transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                    }`}
                   >
                     -
                   </button>
-                  <span className="w-9 text-center text-lg font-mono font-extrabold text-red-400">
+                  <span className="w-9 text-center text-lg font-mono font-extrabold text-red-500">
                     {protons}
                   </span>
                   <button
                     onClick={() => setProtons(p => Math.min(118, p + 1))}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center transition-all"
+                    className={`w-7 h-7 rounded-lg font-bold text-sm flex items-center justify-center transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                    }`}
                   >
                     +
                   </button>
@@ -440,31 +456,37 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             </div>
 
             {/* Neutrons Control (n0) */}
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-2">
+            <div className={`p-3 rounded-xl border space-y-2 ${
+              isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-slate-800/60 border border-slate-600/50 flex items-center justify-center text-slate-300 font-bold text-xs">
                     n⁰
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-300">النيوترونات (N)</h4>
-                    <p className="text-[10px] text-slate-400">تحدد نظير العنصر واستقرار النواة</p>
+                    <h4 className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t('النيوترونات (N)', 'Neutrons (N)')}</h4>
+                    <p className="text-[10px] text-slate-400">{t('تحدد نظير العنصر واستقرار النواة', 'Determines isotope & stability')}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setNeutrons(n => Math.max(0, n - 1))}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center transition-all"
+                    className={`w-7 h-7 rounded-lg font-bold text-sm flex items-center justify-center transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                    }`}
                   >
                     -
                   </button>
-                  <span className="w-9 text-center text-lg font-mono font-extrabold text-slate-300">
+                  <span className={`w-9 text-center text-lg font-mono font-extrabold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                     {neutrons}
                   </span>
                   <button
                     onClick={() => setNeutrons(n => Math.min(180, n + 1))}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center transition-all"
+                    className={`w-7 h-7 rounded-lg font-bold text-sm flex items-center justify-center transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                    }`}
                   >
                     +
                   </button>
@@ -481,31 +503,37 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             </div>
 
             {/* Electrons Control (e-) */}
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-blue-950/40 space-y-2">
+            <div className={`p-3 rounded-xl border border-blue-950/40 space-y-2 ${
+              isDark ? 'bg-slate-950/60' : 'bg-blue-50/50 border-blue-200'
+            }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-blue-950/60 border border-blue-500/50 flex items-center justify-center text-blue-400 font-bold text-xs">
                     e⁻
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-blue-400">الإلكترونات</h4>
-                    <p className="text-[10px] text-slate-400">تدور في المدارات وتحدد الشحنة</p>
+                    <h4 className="text-xs font-bold text-blue-500">{t('الإلكترونات (e⁻)', 'Electrons (e⁻)')}</h4>
+                    <p className="text-[10px] text-slate-400">{t('تدور في المدارات وتحدد الشحنة', 'Orbiting shells & net charge')}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setElectrons(e => Math.max(0, e - 1))}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center transition-all"
+                    className={`w-7 h-7 rounded-lg font-bold text-sm flex items-center justify-center transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                    }`}
                   >
                     -
                   </button>
-                  <span className="w-9 text-center text-lg font-mono font-extrabold text-blue-400">
+                  <span className="w-9 text-center text-lg font-mono font-extrabold text-blue-500">
                     {electrons}
                   </span>
                   <button
                     onClick={() => setElectrons(e => Math.min(118, e + 1))}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm flex items-center justify-center transition-all"
+                    className={`w-7 h-7 rounded-lg font-bold text-sm flex items-center justify-center transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                    }`}
                   >
                     +
                   </button>
@@ -528,7 +556,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                 className="flex items-center justify-center gap-1.5 py-2 px-3 bg-red-950/30 hover:bg-red-900/40 border border-red-900/50 text-red-400 rounded-xl text-xs font-bold transition-all"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>تصفير الذرة</span>
+                <span>{t('تصفير الذرة', 'Reset Atom')}</span>
               </button>
 
               <select
@@ -537,57 +565,67 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                   const found = ALL_ELEMENTS.find(el => el.symbol === e.target.value);
                   if (found) loadElement(found);
                 }}
-                className="py-2 px-3 bg-slate-800 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 focus:outline-none cursor-pointer"
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold focus:outline-none cursor-pointer ${
+                  isDark ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-slate-100 border-slate-300 text-slate-800'
+                }`}
               >
-                <option value="" disabled>اختر عنصراً سريعاً</option>
-                <option value="H">¹H الهيدروجين</option>
-                <option value="He">⁴He الهيليوم</option>
-                <option value="C">¹²C الكربون</option>
-                <option value="N">¹⁴N النيتروجين</option>
-                <option value="O">¹⁶O الأكسجين</option>
-                <option value="Na">²³Na الصوديوم</option>
-                <option value="Al">²⁷Al الألومنيوم</option>
-                <option value="Si">²⁸Si السيليكون</option>
-                <option value="Cl">³⁵Cl الكلور</option>
-                <option value="Fe">⁵⁶Fe الحديد</option>
-                <option value="Cu">⁶⁴Cu النحاس</option>
-                <option value="Ag">¹⁰⁸Ag الفضة</option>
-                <option value="I">¹²⁷I اليود</option>
-                <option value="Au">¹⁹⁷Au الذهب</option>
-                <option value="Pb">²⁰⁸Pb الرصاص</option>
-                <option value="U">²³⁸U اليورانيوم</option>
-                <option value="Og">²⁹⁴Og الأوغانيسون (118)</option>
+                <option value="" disabled>{t('اختر عنصراً سريعاً', 'Choose preset element')}</option>
+                <option value="H">¹H {t('الهيدروجين', 'Hydrogen')}</option>
+                <option value="He">⁴He {t('الهيليوم', 'Helium')}</option>
+                <option value="C">¹²C {t('الكربون', 'Carbon')}</option>
+                <option value="N">¹⁴N {t('النيتروجين', 'Nitrogen')}</option>
+                <option value="O">¹⁶O {t('الأكسجين', 'Oxygen')}</option>
+                <option value="Na">²³Na {t('الصوديوم', 'Sodium')}</option>
+                <option value="Al">²⁷Al {t('الألومنيوم', 'Aluminum')}</option>
+                <option value="Si">²⁸Si {t('السيليكون', 'Silicon')}</option>
+                <option value="Cl">³⁵Cl {t('الكلور', 'Chlorine')}</option>
+                <option value="Fe">⁵⁶Fe {t('الحديد', 'Iron')}</option>
+                <option value="Cu">⁶⁴Cu {t('النحاس', 'Copper')}</option>
+                <option value="Ag">¹⁰⁸Ag {t('الفضة', 'Silver')}</option>
+                <option value="I">¹²⁷I {t('اليود', 'Iodine')}</option>
+                <option value="Au">¹⁹⁷Au {t('الذهب', 'Gold')}</option>
+                <option value="Pb">²⁰⁸Pb {t('الرصاص', 'Lead')}</option>
+                <option value="U">²³⁸U {t('اليورانيوم', 'Uranium')}</option>
+                <option value="Og">²⁹⁴Og {t('الأوغانيسون (118)', 'Oganesson (118)')}</option>
               </select>
             </div>
           </div>
 
           {/* Quick Mini Table Highlighting Bar */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg">
+          <div className={`border rounded-2xl p-4 shadow-lg ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-300">موقع العنصر في الجدول الدوري:</span>
+              <span className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                {t('موقع العنصر في الجدول الدوري:', 'Element Periodic Table Location:')}
+              </span>
               <button
                 onClick={() => setIsPeriodicTableOpen(true)}
                 className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
               >
-                <span>عرض الجدول كاملاً</span>
+                <span>{t('عرض الجدول كاملاً', 'View Full Table')}</span>
                 <ChevronDown className="w-3 h-3" />
               </button>
             </div>
 
-            <div className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 flex items-center justify-between text-xs">
+            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
+              isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div>
-                <span className="text-slate-400">الدورة (Period): </span>
+                <span className="text-slate-400">{t('الدورة:', 'Period:')} </span>
                 <span className="font-mono font-bold text-cyan-400">{currentElement.period || '-'}</span>
               </div>
-              <div className="h-3 w-px bg-slate-800" />
+              <div className={`h-3 w-px ${isDark ? 'bg-slate-800' : 'bg-slate-300'}`} />
               <div>
-                <span className="text-slate-400">المجموعة (Group): </span>
+                <span className="text-slate-400">{t('المجموعة:', 'Group:')} </span>
                 <span className="font-mono font-bold text-cyan-400">{currentElement.group || '-'}</span>
               </div>
-              <div className="h-3 w-px bg-slate-800" />
+              <div className={`h-3 w-px ${isDark ? 'bg-slate-800' : 'bg-slate-300'}`} />
               <div>
-                <span className="text-slate-400">الفئة: </span>
-                <span className="font-semibold text-slate-300">{currentElement.categoryAr}</span>
+                <span className="text-slate-400">{t('الفئة:', 'Category:')} </span>
+                <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {t(currentElement.categoryAr, currentElement.category)}
+                </span>
               </div>
             </div>
           </div>
@@ -595,18 +633,20 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
 
         {/* Middle: Interactive Canvas Viewport (Span 5) */}
         <div className="lg:col-span-5 flex flex-col items-center gap-3">
-          <div className="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col items-center">
+          <div className={`w-full border rounded-2xl p-4 shadow-lg flex flex-col items-center ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
             <div className="w-full flex items-center justify-between mb-2 px-1">
               <span className="text-xs font-semibold text-slate-400">
-                نموذج بور الكمي (مدارات K, L, M, N, O, P, Q)
+                {t('نموذج بور الكمي (مدارات K, L, M, N, O, P, Q)', 'Bohr Atomic Model (Shells K to Q)')}
               </span>
               <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/30 px-2 py-0.5 rounded">
-                {electrons} إلكترونات تدور
+                {electrons} {t('إلكترونات تدور', 'orbiting electrons')}
               </span>
             </div>
 
             {/* Canvas Box */}
-            <div className="relative w-full aspect-square max-w-[420px] bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+            <div className="relative w-full aspect-square max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
               <canvas
                 ref={canvasRef}
                 width={420}
@@ -617,12 +657,12 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
 
             <div className="w-full flex items-center justify-between px-1 mt-3 text-[11px] text-slate-400">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> بروتون
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block mr-2" /> نيوترون
-                <span className="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block mr-2" /> إلكترون
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> {t('بروتون (p⁺)', 'Proton')}
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block mr-2" /> {t('نيوترون (n⁰)', 'Neutron')}
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block mr-2" /> {t('إلكترون (e⁻)', 'Electron')}
               </span>
               <span className="text-cyan-400 cursor-pointer hover:underline" onClick={() => setIsPeriodicTableOpen(true)}>
-                تصفح كافة عناصر الجدول (118)
+                {t('تصفح كافة العناصر (118)', 'Explore all 118 elements')}
               </span>
             </div>
           </div>
@@ -630,14 +670,20 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
 
         {/* Right: Chemical Identity & Live Specs (Span 3) */}
         <div className="lg:col-span-3 flex flex-col gap-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
-            <h3 className="font-bold text-slate-200 text-base pb-2 border-b border-slate-800 flex items-center justify-between">
-              <span>الهوية الكيميائية للذرة</span>
+          <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <h3 className={`font-bold text-base pb-2 border-b flex items-center justify-between ${
+              isDark ? 'text-slate-200 border-slate-800' : 'text-slate-900 border-slate-200'
+            }`}>
+              <span>{t('الهوية الكيميائية للذرة', 'Chemical Identity')}</span>
               <span className="text-xs font-mono text-slate-400">Z = {protons}</span>
             </h3>
 
             {/* Large Periodic Symbol Tile */}
-            <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 flex items-center gap-4">
+            <div className={`p-4 rounded-xl border flex items-center gap-4 ${
+              isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="w-20 h-20 rounded-xl bg-slate-900 border border-cyan-500/40 flex flex-col items-center justify-center relative shadow-md shrink-0">
                 <span className="absolute top-1 left-2 text-[10px] font-mono font-bold text-slate-400">
                   {massNumber > 0 ? massNumber : ''}
@@ -654,42 +700,48 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
               </div>
 
               <div className="space-y-1 min-w-0">
-                <h4 className="text-lg font-black text-white truncate">
-                  {currentElement.name}
+                <h4 className={`text-lg font-black truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {t(currentElement.name, currentElement.englishName)}
                 </h4>
                 <p className="text-xs text-slate-400 font-mono">
                   {currentElement.englishName}
                 </p>
                 <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${colors.border} ${colors.bg} ${colors.text}`}>
-                  {currentElement.categoryAr}
+                  {t(currentElement.categoryAr, currentElement.category)}
                 </span>
               </div>
             </div>
 
             {/* Atomic Counters */}
             <div className="grid grid-cols-2 gap-2 text-center text-xs">
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-                <span className="text-slate-400 font-semibold block text-[10px] mb-1">العدد الذري (Z)</span>
-                <span className="text-xl font-mono font-black text-red-400">{protons}</span>
+              <div className={`p-2.5 rounded-xl border ${
+                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className="text-slate-400 font-semibold block text-[10px] mb-1">{t('العدد الذري (Z)', 'Atomic Number (Z)')}</span>
+                <span className="text-xl font-mono font-black text-red-500">{protons}</span>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-                <span className="text-slate-400 font-semibold block text-[10px] mb-1">العدد الكتلي (A)</span>
-                <span className="text-xl font-mono font-black text-slate-300">{massNumber}</span>
+              <div className={`p-2.5 rounded-xl border ${
+                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className="text-slate-400 font-semibold block text-[10px] mb-1">{t('العدد الكتلي (A)', 'Mass Number (A)')}</span>
+                <span className={`text-xl font-mono font-black ${isDark ? 'text-slate-300' : 'text-slate-800'}`}>{massNumber}</span>
               </div>
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 col-span-2 flex items-center justify-between px-4">
-                <span className="text-slate-400 text-xs font-semibold">الشحنة الصافية:</span>
+              <div className={`p-2.5 rounded-xl border col-span-2 flex items-center justify-between px-4 ${
+                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className="text-slate-400 text-xs font-semibold">{t('الشحنة الصافية:', 'Net Charge:')}</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-base font-extrabold text-white">
+                  <span className={`font-mono text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     {netCharge > 0 ? `+${netCharge}` : `${netCharge}`}
                   </span>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                     netCharge === 0
-                      ? 'bg-slate-800 text-slate-300'
+                      ? isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
                       : netCharge > 0
                       ? 'bg-amber-950/80 text-amber-300 border border-amber-800/50'
                       : 'bg-blue-950/80 text-blue-300 border border-blue-800/50'
                   }`}>
-                    {netCharge === 0 ? 'متعادلة كهربائياً' : netCharge > 0 ? 'كاتيون (أيون موجب)' : 'أنيون (أيون سالب)'}
+                    {netCharge === 0 ? t('متعادلة كهربائياً', 'Neutral Atom') : netCharge > 0 ? t('كاتيون (أيون موجب)', 'Cation (+ Ion)') : t('أنيون (أيون سالب)', 'Anion (- Ion)')}
                   </span>
                 </div>
               </div>
@@ -698,7 +750,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             {/* Nuclear Stability Badge */}
             <div className={`p-3 rounded-xl border flex items-center justify-between ${
               protons === 0
-                ? 'bg-slate-950/40 border-slate-800 text-slate-400'
+                ? isDark ? 'bg-slate-950/40 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
                 : isStable
                 ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-400 shadow-sm shadow-emerald-500/10'
                 : 'bg-amber-950/30 border-amber-800/40 text-amber-400 unstable-nucleus-pulse'
@@ -712,20 +764,22 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                   <ShieldAlert className="w-4 h-4 text-amber-400" />
                 )}
                 <span className="text-xs font-bold">
-                  {protons === 0 ? 'لا توجد نواة' : isStable ? 'نواة مستقرة' : 'نواة غير مستقرة (مشعة)'}
+                  {protons === 0 ? t('لا توجد نواة', 'No nucleus') : isStable ? t('نواة مستقرة', 'Stable Nucleus') : t('نواة غير مستقرة (مشعة)', 'Unstable (Radioactive)')}
                 </span>
               </div>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                 protons === 0 ? 'bg-slate-800 text-slate-400' : isStable ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
               }`}>
-                {protons === 0 ? '--' : isStable ? 'مستقر كيميائياً' : 'تخضع لاضمحلال'}
+                {protons === 0 ? '--' : isStable ? t('مستقر كيميائياً', 'Stable') : t('تخضع لاضمحلال', 'Decaying')}
               </span>
             </div>
 
             {/* Electron Configuration */}
-            <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 space-y-1.5">
+            <div className={`p-3 rounded-xl border space-y-1.5 ${
+              isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-semibold">التوزيع الإلكتروني:</span>
+                <span className="text-slate-400 font-semibold">{t('التوزيع الإلكتروني:', 'Electron Config:')}</span>
                 <span className="font-mono text-cyan-400 text-xs font-semibold">
                   {currentElement.electronConfig}
                 </span>
@@ -735,7 +789,9 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                   const count = currentElement.electronShells ? currentElement.electronShells[i] || 0 : 0;
                   if (count === 0 && i >= (currentElement.electronShells?.length || 0)) return null;
                   return (
-                    <span key={name} className="px-1.5 py-0.5 bg-slate-900 rounded border border-slate-800">
+                    <span key={name} className={`px-1.5 py-0.5 rounded border ${
+                      isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-300 text-slate-700'
+                    }`}>
                       {name}:{count}
                     </span>
                   );
@@ -744,8 +800,10 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             </div>
 
             {/* Element Fact Description */}
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/60 text-xs text-slate-300 leading-relaxed">
-              <p>{currentElement.desc}</p>
+            <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+              isDark ? 'bg-slate-950/40 border-slate-800/60 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}>
+              <p>{getElementDescription(currentElement, lang)}</p>
             </div>
           </div>
         </div>

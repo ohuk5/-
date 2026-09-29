@@ -1,8 +1,21 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   body {
     font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Enforce standard English/Western numerals (0-9) everywhere and disable font auto-substitution to Eastern Arabic digits */
+  *, *::before, *::after {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "locl" 0;
+  }
+
+  input, select, textarea, button {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: "locl" 0;
   }
 }
 
@@ -11,15 +24,24 @@
   width: 6px;
   height: 6px;
 }
+.dark ::-webkit-scrollbar-track,
 ::-webkit-scrollbar-track {
-  background: #090d16;
+  background: #0f172a;
 }
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.dark ::-webkit-scrollbar-thumb,
 ::-webkit-scrollbar-thumb {
-  background: #243046;
+  background: #334155;
+  border-radius: 4px;
+}
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #384b6c;
+  background: #06b6d4;
 }
 
 /* Slider custom styling */
@@ -39,3 +61,4 @@ input[type="range"] {
 .unstable-nucleus-pulse {
   animation: pulseGlow 1.8s infinite ease-in-out;
 }
+

@@ -15,6 +15,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { ISOTOPES, IsotopeInfo } from '../data/isotopesData';
+import { useApp } from '../context/AppContext';
 
 interface DecayCell {
   id: number;
@@ -38,6 +39,8 @@ interface RadioactiveDecayProps {
 }
 
 export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide }) => {
+  const { lang, theme, t } = useApp();
+  const isDark = theme === 'dark';
   const [selectedIsotopeId, setSelectedIsotopeId] = useState<string>('carbon14');
   const [gridCells, setGridCells] = useState<DecayCell[]>([]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -399,20 +402,26 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Left: Isotope Selector & Nuclear Specs (Span 4) */}
         <div className="lg:col-span-4 flex flex-col gap-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800 gap-2">
-              <h3 className="font-bold text-slate-200 text-base flex items-center gap-2">
-                <span>اختر النظير المشع</span>
+          <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div className={`flex items-center justify-between pb-2 border-b gap-2 ${
+              isDark ? 'border-slate-800' : 'border-slate-200'
+            }`}>
+              <h3 className={`font-bold text-base flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
+                <span>{t('اختر النظير المشع', 'Select Radioactive Isotope')}</span>
               </h3>
               <div className="flex items-center gap-1.5">
                 {onOpenGuide && (
                   <button
                     onClick={onOpenGuide}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium transition-all"
-                    title="شرح عمر النصف والإشعاع"
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
+                      isDark ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                    }`}
+                    title={t('شرح عمر النصف والإشعاع', 'Half-life & Radiation Guide')}
                   >
                     <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>دليل عمر النصف</span>
+                    <span>{t('دليل عمر النصف', 'Guide')}</span>
                   </button>
                 )}
                 <Radiation className="w-4 h-4 text-emerald-400" />
@@ -422,52 +431,64 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
             {/* Isotope Dropdown */}
             <div className="space-y-1.5">
               <label className="text-xs text-slate-400 font-semibold block">
-                مكتبة النظائر الإشعاعية الموسعة (6 أمثلة واقعية):
+                {t('مكتبة النظائر الإشعاعية الموسعة (6 أمثلة واقعية):', 'Radioactive Isotopes Library (6 Real Examples):')}
               </label>
               <select
                 value={selectedIsotopeId}
                 onChange={(e) => setSelectedIsotopeId(e.target.value)}
-                className="w-full py-2.5 px-3 bg-slate-950 border border-slate-700 rounded-xl text-xs sm:text-sm font-bold text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                className={`w-full py-2.5 px-3 border rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:border-emerald-500 cursor-pointer ${
+                  isDark ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-300 text-slate-800'
+                }`}
               >
-                <option value="carbon14">⚛️ الكربون-14 (تأريخ الحفريات، 5,730 سنة)</option>
-                <option value="iodine131">🩺 اليود-131 (طب الغدة الدرقية، 8.02 أيام)</option>
-                <option value="radon222">💨 الرادون-222 (غاز الصخور المشع، 3.82 أيام)</option>
-                <option value="cesium137">☢️ السيزيوم-137 (المفاعلات والصناعة، 30.17 سنة)</option>
-                <option value="cobalt60">🔬 الكوبالت-60 (التعقيم وسكين غاما، 5.27 سنة)</option>
-                <option value="uranium238">🌋 اليورانيوم-238 (عمر الأرض، 4.468 مليار سنة)</option>
+                <option value="carbon14">⚛️ {t('الكربون-14 (تأريخ الحفريات، 5,730 سنة)', 'Carbon-14 (Archeology Dating, 5,730 yrs)')}</option>
+                <option value="iodine131">🩺 {t('اليود-131 (طب الغدة الدرقية، 8.02 أيام)', 'Iodine-131 (Thyroid Medicine, 8.02 days)')}</option>
+                <option value="radon222">💨 {t('الرادون-222 (غاز الصخور المشع، 3.82 أيام)', 'Radon-222 (Radioactive Rock Gas, 3.82 days)')}</option>
+                <option value="cesium137">☢️ {t('السيزيوم-137 (المفاعلات والصناعة، 30.17 سنة)', 'Cesium-137 (Reactors & Industry, 30.17 yrs)')}</option>
+                <option value="cobalt60">🔬 {t('الكوبالت-60 (التعقيم وسكين غاما، 5.27 سنة)', 'Cobalt-60 (Sterilization & Gamma, 5.27 yrs)')}</option>
+                <option value="uranium238">🌋 {t('اليورانيوم-238 (عمر الأرض، 4.468 مليار سنة)', 'Uranium-238 (Age of Earth, 4.468 B yrs)')}</option>
               </select>
             </div>
 
             {/* Specs Card */}
-            <div className="bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 space-y-2.5 text-xs">
+            <div className={`p-3.5 rounded-xl border space-y-2.5 text-xs ${
+              isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
               <div className="grid grid-cols-2 gap-2 text-center">
-                <div className="bg-slate-900 p-2 rounded-lg border border-slate-800/80">
-                  <span className="text-slate-400 text-[10px] block font-semibold">عمر النصف (T₁/₂)</span>
-                  <span className="font-mono font-bold text-amber-400 text-sm mt-0.5 block">
-                    {activeIsotope.halfLifeStr}
+                <div className={`p-2 rounded-lg border ${
+                  isDark ? 'bg-slate-900 border-slate-800/80' : 'bg-white border-slate-200'
+                }`}>
+                  <span className="text-slate-400 text-[10px] block font-semibold">{t('عمر النصف (T₁/₂)', 'Half-Life (T₁/₂)')}</span>
+                  <span className="font-mono font-bold text-amber-500 text-sm mt-0.5 block">
+                    {lang === 'ar' ? activeIsotope.halfLifeStr : activeIsotope.halfLifeStrEn}
                   </span>
                 </div>
-                <div className="bg-slate-900 p-2 rounded-lg border border-slate-800/80">
-                  <span className="text-slate-400 text-[10px] block font-semibold">نمط الاضمحلال</span>
+                <div className={`p-2 rounded-lg border ${
+                  isDark ? 'bg-slate-900 border-slate-800/80' : 'bg-white border-slate-200'
+                }`}>
+                  <span className="text-slate-400 text-[10px] block font-semibold">{t('نمط الاضمحلال', 'Decay Mode')}</span>
                   <span className="font-bold text-red-400 text-xs mt-0.5 block truncate">
-                    {activeIsotope.decayModeAr}
+                    {lang === 'ar' ? activeIsotope.decayModeAr : activeIsotope.decayModeEn}
                   </span>
                 </div>
               </div>
 
               {/* Nuclear Equation */}
-              <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-center">
+              <div className={`p-2.5 rounded-lg border text-center ${
+                isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+              }`}>
                 <span className="text-slate-400 text-[10px] block font-semibold mb-1">
-                  معادلة التحول النووي (Transmutation):
+                  {t('معادلة التحول النووي (Transmutation):', 'Transmutation Nuclear Equation:')}
                 </span>
-                <span className="font-mono font-black text-cyan-300 text-sm tracking-wide">
+                <span className="font-mono font-black text-cyan-400 text-sm tracking-wide">
                   {activeIsotope.equation}
                 </span>
               </div>
 
-              <div className="text-[11px] text-slate-400 leading-relaxed pt-1 border-t border-slate-800/60">
-                <strong className="text-emerald-400">التطبيق العملي: </strong>
-                {activeIsotope.practicalUse}
+              <div className={`text-[11px] leading-relaxed pt-1 border-t ${
+                isDark ? 'text-slate-400 border-slate-800/60' : 'text-slate-600 border-slate-200'
+              }`}>
+                <strong className="text-emerald-500">{t('التطبيق العملي: ', 'Practical Application: ')}</strong>
+                {lang === 'ar' ? activeIsotope.practicalUse : activeIsotope.practicalUseEn}
               </div>
             </div>
 
@@ -483,37 +504,45 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
                   }`}
                 >
                   {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                  <span>{isPlaying ? 'إيقاف مؤقت' : 'بدء المحاكاة'}</span>
+                  <span>{isPlaying ? t('إيقاف مؤقت', 'Pause') : t('بدء المحاكاة', 'Start Simulation')}</span>
                 </button>
 
                 <button
                   onClick={tickCycle}
                   disabled={isPlaying || unstableCount === 0}
-                  className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+                  className={`py-2.5 px-3 disabled:opacity-40 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                    isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                  }`}
                 >
                   <SkipForward className="w-3.5 h-3.5" />
-                  <span>خطوة (عمر نصف)</span>
+                  <span>{t('خطوة (عمر نصف)', 'Step (1 Half-life)')}</span>
                 </button>
               </div>
 
               <button
                 onClick={initSimulation}
-                className="w-full py-2 px-3 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
+                className={`w-full py-2 px-3 border rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                  isDark ? 'bg-slate-950 hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                }`}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>إعادة تعيين 100 نواة مشعة</span>
+                <span>{t('إعادة تعيين 100 نواة مشعة', 'Reset 100 Nuclei')}</span>
               </button>
             </div>
           </div>
 
           {/* Single Nucleus Disintegration Experiment */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3">
-            <h4 className="font-bold text-slate-200 text-sm flex items-center justify-between pb-2 border-b border-slate-800">
-              <span>مختبر اضمحلال نواة مفردة</span>
+          <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-3 ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <h4 className={`font-bold text-sm flex items-center justify-between pb-2 border-b ${
+              isDark ? 'text-slate-200 border-slate-800' : 'text-slate-900 border-slate-200'
+            }`}>
+              <span>{t('مختبر اضمحلال نواة مفردة', 'Single Nucleus Chamber')}</span>
               <Microscope className="w-4 h-4 text-cyan-400" />
             </h4>
-            <p className="text-[11px] text-slate-400">
-              انقر لإثارة نواة واحدة ومشاهدة تحللها اللحظي إلى النواة الابنة مع إطلاق الإشعاع:
+            <p className="text-[11px] text-slate-400 leading-tight">
+              {t('انقر لإثارة نواة واحدة ومشاهدة تحللها اللحظي إلى النواة الابنة مع إطلاق الإشعاع:', 'Click to trigger spontaneous single nucleus disintegration and emission:')}
             </p>
 
             {/* Canvas Box */}
@@ -533,14 +562,16 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
                 className="py-2 px-3 bg-red-950/40 hover:bg-red-900/40 border border-red-900/50 text-red-400 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all"
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>إثارة النواة واضمحلالها</span>
+                <span>{t('إثارة النواة واضمحلالها', 'Trigger Decay')}</span>
               </button>
 
               <button
                 onClick={resetSingleDecay}
-                className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition-all"
+                className={`py-2 px-3 font-semibold text-xs rounded-xl transition-all ${
+                  isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                }`}
               >
-                إعادة النواة الأصلية
+                {t('إعادة النواة الأصلية', 'Restore Nucleus')}
               </button>
             </div>
           </div>
@@ -548,13 +579,15 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
 
         {/* Middle: 100 Nuclei Stochastic Grid (Span 5) */}
         <div className="lg:col-span-5 flex flex-col gap-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+          <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-200 text-base">
-                شبكة النوى المشعة (100 نواة)
+              <h3 className={`font-bold text-base ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
+                {t('شبكة النوى المشعة (100 نواة)', 'Radioactive Grid (100 Nuclei)')}
               </h3>
               <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-800 px-2 py-0.5 rounded">
-                الدورة: {elapsedCycles} ({realElapsedTime} {activeIsotope.timeUnit})
+                {t('الدورة:', 'Cycle:')} {elapsedCycles} ({realElapsedTime} {t(activeIsotope.timeUnit, 'units')})
               </span>
             </div>
 
@@ -567,8 +600,8 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
                     key={cell.id}
                     title={
                       isUnstable
-                        ? `نواة ${activeIsotope.name} غير مستقرة`
-                        : `نواة ${activeIsotope.daughterName} مستقرة ناتجة في الدورة ${cell.decayCycle}`
+                        ? `${activeIsotope.name} unstable`
+                        : `${activeIsotope.daughterName} stable (Cycle ${cell.decayCycle})`
                     }
                     className={`aspect-square rounded-full transition-all duration-700 flex items-center justify-center ${
                       isUnstable
@@ -584,33 +617,38 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
             <div className="grid grid-cols-2 gap-3 text-center">
               <div className="bg-red-950/20 border border-red-900/40 p-3 rounded-xl">
                 <span className="text-xs text-slate-400 block font-semibold mb-1">
-                  النسبة المشعة المتبقية
+                  {t('النسبة المشعة المتبقية', 'Remaining Radioactive')}
                 </span>
                 <span className="font-mono text-2xl font-black text-red-400">
                   {unstableCount}%
                 </span>
                 <span className="text-[10px] text-slate-500 block mt-0.5 font-mono">
-                  {unstableCount} من 100 نواة
+                  {unstableCount} / 100 {t('نواة', 'nuclei')}
                 </span>
               </div>
 
               <div className="bg-emerald-950/20 border border-emerald-900/40 p-3 rounded-xl">
                 <span className="text-xs text-slate-400 block font-semibold mb-1">
-                  النسبة المستقرة المتكونة
+                  {t('النسبة المستقرة المتكونة', 'Stable Daughters Formed')}
                 </span>
                 <span className="font-mono text-2xl font-black text-emerald-400">
                   {stableCount}%
                 </span>
                 <span className="text-[10px] text-slate-500 block mt-0.5 font-mono">
-                  {stableCount} من 100 نواة
+                  {stableCount} / 100 {t('نواة', 'nuclei')}
                 </span>
               </div>
             </div>
 
             {/* Explanation on Stochastic Behavior */}
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed">
+            <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+              isDark ? 'bg-slate-950/40 border-slate-800/80 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}>
               <p>
-                💡 <strong>الطبيعة الاحتمالية:</strong> تحلل أي نواة فردية محددة هو حدث كمي عشوائي تماماً لا يمكن التنبؤ بلحظة حدوثه بدقة. لكن عند اجتماع عدد كبير من النوى (كما في هذه المئة)، يظهر قانون نصف العمر الإحصائي الدقيق (كل دورة ينخفض العدد للنصف تقريباً).
+                💡 <strong>{t('الطبيعة الاحتمالية:', 'Stochastic Nature:')}</strong> {t(
+                  'تحلل أي نواة فردية محددة هو حدث كمي عشوائي تماماً لا يمكن التنبؤ بلحظة حدوثه بدقة. لكن عند اجتماع عدد كبير من النوى، يظهر قانون نصف العمر الإحصائي الدقيق.',
+                  'Decay of an individual nucleus is completely random and unpredictable. With a large sample, the exact statistical half-life rule emerges.'
+                )}
               </p>
             </div>
           </div>
@@ -618,9 +656,13 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
 
         {/* Right: Exponential Decay Chart & Scientific Insights (Span 3) */}
         <div className="lg:col-span-3 flex flex-col gap-4">
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
-            <h3 className="font-bold text-slate-200 text-base pb-2 border-b border-slate-800 flex items-center justify-between">
-              <span>منحنى الاضمحلال الأسي</span>
+          <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
+            isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <h3 className={`font-bold text-base pb-2 border-b flex items-center justify-between ${
+              isDark ? 'text-slate-200 border-slate-800' : 'text-slate-900 border-slate-200'
+            }`}>
+              <span>{t('منحنى الاضمحلال الأسي', 'Decay Curve')}</span>
               <TrendingDown className="w-4 h-4 text-cyan-400" />
             </h3>
 
@@ -685,19 +727,21 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
               </svg>
 
               <div className="w-full flex justify-between px-2 pt-1 text-[9px] text-slate-500 font-mono">
-                <span>0 دورات</span>
-                <span className="text-cyan-400">--- الخط النظري</span>
-                <span className="text-red-400">━ المحاكاة الحية</span>
+                <span>0 {t('دورات', 'cycles')}</span>
+                <span className="text-cyan-400">--- {t('الخط النظري', 'Theory')}</span>
+                <span className="text-red-400">━ {t('المحاكاة الحية', 'Simulation')}</span>
               </div>
             </div>
 
             {/* Educational Science Card */}
-            <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/80 text-xs text-slate-300 leading-relaxed space-y-1.5">
-              <h5 className="font-bold text-slate-200 flex items-center gap-1.5">
+            <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-1.5 ${
+              isDark ? 'bg-slate-950/40 border-slate-800/80 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}>
+              <h5 className={`font-bold flex items-center gap-1.5 ${isDark ? 'text-slate-200' : 'text-slate-900'}`}>
                 <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
-                <span>عن {activeIsotope.name}:</span>
+                <span>{lang === 'ar' ? `عن ${activeIsotope.name}:` : `About ${activeIsotope.nameEn}:`}</span>
               </h5>
-              <p>{activeIsotope.scienceDesc}</p>
+              <p>{lang === 'ar' ? activeIsotope.scienceDesc : activeIsotope.scienceDescEn}</p>
             </div>
           </div>
         </div>

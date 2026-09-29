@@ -8,10 +8,12 @@ import { Header } from './components/Header';
 import { AtomBuilder } from './components/AtomBuilder';
 import { StatesOfMatter } from './components/StatesOfMatter';
 import { RadioactiveDecay } from './components/RadioactiveDecay';
+import { ExperimentalLab } from './components/ExperimentalLab';
 import { GuideModal } from './components/GuideModal';
+import { AppProvider, useApp } from './context/AppContext';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<'atom-builder' | 'states-of-matter' | 'radioactive-decay'>('states-of-matter');
+function MainAppContent() {
+  const { lang, theme, t, activeTab } = useApp();
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [guideCategory, setGuideCategory] = useState<'basics' | 'states' | 'atoms' | 'decay' | 'missions'>('basics');
 
@@ -24,22 +26,26 @@ export default function App() {
       setGuideCategory('atoms');
     } else if (activeTab === 'radioactive-decay') {
       setGuideCategory('decay');
+    } else if (activeTab === 'experiments-lab') {
+      setGuideCategory('missions');
     } else {
       setGuideCategory('basics');
     }
     setIsGuideOpen(true);
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Top Header */}
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onOpenGuide={() => handleOpenGuide()}
-      />
+  const isDark = theme === 'dark';
 
-      {/* Main Simulator Stage */}
+  return (
+    <div className={`min-h-screen flex flex-col justify-between transition-colors duration-200 ${
+      isDark
+        ? 'bg-slate-950 text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200'
+        : 'bg-slate-50 text-slate-900 selection:bg-cyan-600/20 selection:text-cyan-800'
+    }`}>
+      {/* Top Header */}
+      <Header onOpenGuide={() => handleOpenGuide()} />
+
+      {/* Main Simulator & Lab Stage */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 md:p-6">
         {activeTab === 'atom-builder' && (
           <AtomBuilder onOpenGuide={() => handleOpenGuide('atoms')} />
@@ -50,12 +56,20 @@ export default function App() {
         {activeTab === 'radioactive-decay' && (
           <RadioactiveDecay onOpenGuide={() => handleOpenGuide('decay')} />
         )}
+        {activeTab === 'experiments-lab' && (
+          <ExperimentalLab />
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 px-4 py-4 text-center text-xs text-slate-500 font-medium">
+      <footer className={`border-t px-4 py-4 text-center text-xs font-medium transition-colors ${
+        isDark ? 'border-slate-900 bg-slate-950/80 text-slate-500' : 'border-slate-200 bg-white text-slate-600'
+      }`}>
         <p>
-          محاكي سلوك الذرات وحالات المادة والنشاط الإشعاعي التفاعلي — تم التطوير الشامل للدليل العلمي، ومعايرة أطوار المادة، وتأثيرات الضغط والجاذبية، وتجارب التعلم الذاتي.
+          {t(
+            'محاكي سلوك الذرات وحالات المادة والنشاط الإشعاعي ومعمل التجارب الافتراضي — دعم الوضعين الليلي والنهاري، واللغتين العربية والإنجليزية، وتجارب إرشادية وحرة متقدمة.',
+            'Interactive Atomic, States of Matter, Radioactive Decay Simulator & Experimental Lab — Supporting Dark/Light themes, Arabic/English bilingual modes, and Advanced Guided & Open Sandbox Experiments.'
+          )}
         </p>
       </footer>
 
@@ -66,5 +80,13 @@ export default function App() {
         initialCategory={guideCategory}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <MainAppContent />
+    </AppProvider>
   );
 }
