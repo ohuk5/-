@@ -31,6 +31,7 @@ import {
   calculateEffectiveMeltingPoint
 } from '../data/substancesData';
 import { useApp } from '../context/AppContext';
+import { SimulationViewport } from './SimulationViewport';
 
 interface Particle {
   x: number;
@@ -1041,7 +1042,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
   const isDark = theme === 'dark';
 
   return (
-    <div className="space-y-6">
+    <div className="lab-workbench flex flex-col gap-5">
       {/* Live Phase Transition Alert Banner */}
       {transitionNotification && (
         <div className="bg-gradient-to-l from-cyan-950 via-slate-900 to-slate-950 border-2 border-cyan-500 rounded-2xl p-4 shadow-xl flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -1147,7 +1148,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
 
       <div className="w-full flex flex-col md:flex-row gap-5 items-start overflow-x-hidden">
         {/* Left Column: Substance Selection & Physics Controls */}
-        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
+        <div className="lab-substance-column w-full md:w-[260px] xl:w-[290px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
           {/* Substance Selector Card (Expanded to 12 substances including Gold & Bromine!) */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
@@ -1336,7 +1337,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         </div>
 
         {/* Main Simulation Stage & Thermal Controls */}
-        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+        <div className="w-full flex-1 min-w-0 flex flex-col xl:flex-row gap-5 order-1 md:order-2">
           {/* Middle Column: Physical Simulation Vessel & Correct Phase Gauge */}
           <div className="w-full lg:flex-1 flex flex-col items-center gap-4">
           <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center ${
@@ -1367,7 +1368,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
             </div>
 
             {/* Interactive Canvas Stage */}
-            <div className="relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border-2 border-slate-700/60 rounded-xl overflow-hidden shadow-2xl">
+            <SimulationViewport kind="matter" particles={particlesRef} substance={substance} count={particleCount} volume={volumeLidPercent} phase={phaseInfo.phase} burner={burnerActive}>
               <canvas
                 ref={canvasRef}
                 width={460}
@@ -1375,16 +1376,14 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
+                onMouseLeave={handleCanvasMouseUp}
                 onTouchStart={handleCanvasTouchStart}
                 onTouchMove={handleCanvasTouchMove}
                 onTouchEnd={handleCanvasTouchEnd}
-                className="w-full h-full relative z-10 cursor-ns-resize touch-none select-none"
+                aria-label={t('محاكاة الجزيئات ثنائية الأبعاد؛ استخدم أزرار المكبس للتحكم بلوحة المفاتيح', '2D molecular simulation; use piston buttons for keyboard control')}
+                className="w-full h-full cursor-ns-resize touch-none select-none"
               />
-              <div className="absolute top-2 left-2 z-20 pointer-events-none text-[10px] text-slate-300 bg-slate-900/80 px-2 py-1 rounded border border-slate-800 flex items-center gap-1">
-                <span>↕</span>
-                <span>{t('اسحب المكبس باللمس أو الماوس', 'Drag piston by touch or mouse')}</span>
-              </div>
-            </div>
+            </SimulationViewport>
 
             {/* Direct Piston Controls (For Mobile & Precision) */}
             <div className={`w-full mt-3 p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
@@ -1522,7 +1521,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         </div>
 
           {/* Right Column: Thermal & Pressure Controls + Gauges */}
-          <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
+          <div className="w-full xl:w-[280px] shrink-0 flex flex-col gap-4">
           {/* Direct Temperature Input & Thermal Controls Card */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'

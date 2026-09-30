@@ -16,6 +16,7 @@ import { ALL_ELEMENTS, ELEMENT_MAP, ElementInfo, CATEGORY_COLORS } from '../data
 import { getElementDescription } from '../data/elementDescriptionsEn';
 import { PeriodicTableModal } from './PeriodicTableModal';
 import { useApp } from '../context/AppContext';
+import { SimulationViewport } from './SimulationViewport';
 
 interface NucleusNode {
   x: number;
@@ -465,12 +466,20 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   };
 
   const colors = CATEGORY_COLORS[currentElement.category] || CATEGORY_COLORS['nonmetal'];
+  const sceneShells = electrons === protons ? currentElement.electronShells : (() => {
+    let remaining = electrons;
+    return [2, 8, 18, 32, 32, 18, 8].map(capacity => {
+      const count = Math.min(capacity, remaining);
+      remaining -= count;
+      return count;
+    });
+  })();
 
   return (
-    <div className="w-full space-y-6 overflow-x-hidden">
+    <div className="lab-workbench w-full space-y-6 overflow-x-hidden">
       <div className="w-full flex flex-col md:flex-row gap-5 items-start">
         {/* Left: Particle Controls Deck */}
-        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
+        <div className="w-full md:w-[260px] xl:w-[290px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -733,7 +742,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         </div>
 
         {/* Right / Main Simulator Stage */}
-        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+        <div className="w-full flex-1 min-w-0 flex flex-col xl:flex-row gap-5 order-1 md:order-2">
           {/* Middle: Interactive Canvas Viewport */}
           <div className="w-full lg:flex-1 flex flex-col items-center gap-3">
           <div className={`w-full border rounded-2xl p-4 shadow-lg flex flex-col items-center ${
@@ -749,14 +758,9 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             </div>
 
             {/* Canvas Box */}
-            <div className="relative w-full aspect-square max-w-[340px] sm:max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
-              <canvas
-                ref={canvasRef}
-                width={420}
-                height={420}
-                className="w-full h-full"
-              />
-            </div>
+            <SimulationViewport kind="atom" protons={protons} neutrons={neutrons} shells={sceneShells} speed={orbitSpeed} showSpin={showSpinArrows}>
+              <canvas ref={canvasRef} width={420} height={420} className="w-full h-full" aria-label={t('نموذج مبسط للأغلفة الإلكترونية', 'Simplified electron-shell model')} />
+            </SimulationViewport>
 
             <div className="w-full flex items-center justify-between px-1 mt-3 text-[11px] text-slate-400">
               <span className="flex items-center gap-1.5">
@@ -860,7 +864,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         </div>
 
         {/* Right: Chemical Identity & Live Specs */}
-        <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
+        <div className="w-full xl:w-[280px] shrink-0 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>

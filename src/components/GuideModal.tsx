@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ScienceLibrary } from './ScienceLibrary';
 import {
   X,
   Atom,
@@ -36,14 +37,32 @@ export const GuideModal: React.FC<GuideModalProps> = ({
   const { lang, theme, t } = useApp();
   const isDark = theme === 'dark';
   const isAr = lang === 'ar';
-  const [activeCategory, setActiveCategory] = useState<'basics' | 'states' | 'atoms' | 'decay' | 'missions'>(initialCategory);
+  const [activeCategory, setActiveCategory] = useState<'basics' | 'states' | 'atoms' | 'decay' | 'missions' | 'library'>(initialCategory);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveCategory(initialCategory);
+    setSearchQuery('');
+    dialogRef.current?.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isOpen, initialCategory]);
+
+  useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }); }, [activeCategory, searchQuery]);
 
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5 overflow-y-auto"
+    <dialog
+      ref={dialogRef}
+      className="guide-dialog fixed inset-0 items-center justify-center bg-transparent p-3 sm:p-5"
+      aria-labelledby="science-guide-title"
+      onCancel={onClose}
+      onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       dir={isAr ? 'rtl' : 'ltr'}
     >
       <div
@@ -62,7 +81,7 @@ export const GuideModal: React.FC<GuideModalProps> = ({
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <h2 className={`text-base sm:text-lg font-black flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <h2 id="science-guide-title" className={`text-base sm:text-lg font-black flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <span>{t('الموسوعة والدليل العلمي التفاعلي المبسط', 'Interactive Scientific Encyclopedia & Guide')}</span>
                 <span className="text-[11px] font-bold bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-500/30 hidden sm:inline-block">
                   {t('من الصفر حتى الاحتراف', 'Beginner to Advanced')}
@@ -94,7 +113,8 @@ export const GuideModal: React.FC<GuideModalProps> = ({
           }`}
         >
           {/* Category Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs font-bold no-scrollbar">
+          <div className="guide-category-tabs flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs font-bold no-scrollbar" aria-label={t('أقسام الدليل', 'Guide categories')}>
+            <button onClick={() => { setActiveCategory('library'); setSearchQuery(''); }} aria-pressed={activeCategory === 'library'} className="science-library-tab"><BookOpen size={14} />{t('المكتبة الموسّعة', 'Full library')}</button>
             <button
               onClick={() => setActiveCategory('basics')}
               className={`px-3 py-2 rounded-xl border transition-all whitespace-nowrap flex items-center gap-1.5 ${
@@ -160,7 +180,8 @@ export const GuideModal: React.FC<GuideModalProps> = ({
           <div className="relative min-w-[200px]">
             <Search className={`w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 ${isAr ? 'left-3' : 'right-3'}`} />
             <input
-              type="text"
+              type="search"
+              aria-label={t('ابحث في الدليل العلمي', 'Search scientific guide')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('ابحث في الدليل العلمي...', 'Search scientific guide...')}
@@ -172,7 +193,10 @@ export const GuideModal: React.FC<GuideModalProps> = ({
         </div>
 
         {/* Scrollable Content Body */}
-        <div className={`p-4 sm:p-6 space-y-6 overflow-y-auto flex-1 leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+        <div ref={bodyRef} className={`guide-scroll-body p-4 sm:p-6 overflow-y-auto flex-1 leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+          <ScienceLibrary category={activeCategory} query={searchQuery} />
+          {!searchQuery.trim() && activeCategory !== 'library' && <details className="legacy-guide">
+            <summary>{t('المزيد من الشروحات والتجارب في هذا القسم', 'More explanations and experiments in this section')}</summary>
           {/* TAB 1: BEGINNER BASICS */}
           {activeCategory === 'basics' && (
             <div className="space-y-5 animate-in fade-in duration-300">
@@ -441,7 +465,7 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                     </div>
                     <p className="text-slate-400">
                       {t(
-                        'الضغط العالي يقرب الجزيئات ويرفع درجة الغليان فوق درجة الحرارة الحالية، مما يجبر الغاز على التحول إلى سائل مائع!',
+                        'الضغط العالي يقرب الجزيئات ويرفع درجة الغليان ف��ق درجة الحرارة الحالية، مما يجبر الغاز على التحول إلى سائل مائع!',
                         'Compression forces molecules together and elevates the boiling point above current temperature, forcing vapor to condense into liquid!'
                       )}
                     </p>
@@ -990,6 +1014,7 @@ export const GuideModal: React.FC<GuideModalProps> = ({
               </div>
             </div>
           )}
+          </details>}
         </div>
 
         {/* Bottom Footer Actions */}
@@ -1008,6 +1033,6 @@ export const GuideModal: React.FC<GuideModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };

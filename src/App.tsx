@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import { Header } from './components/Header';
+import { LabIntro } from './components/LabIntro';
 import { AtomBuilder } from './components/AtomBuilder';
 import { StatesOfMatter } from './components/StatesOfMatter';
 import { RadioactiveDecay } from './components/RadioactiveDecay';
@@ -37,7 +38,7 @@ function MainAppContent() {
   const isDark = theme === 'dark';
 
   return (
-    <div className={`min-h-screen flex flex-col justify-between transition-colors duration-200 overflow-x-hidden w-full ${
+    <div className={`lab-app min-h-screen flex flex-col justify-between transition-colors duration-200 overflow-x-hidden w-full ${
       isDark
         ? 'bg-slate-950 text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200'
         : 'bg-slate-50 text-slate-900 selection:bg-cyan-600/20 selection:text-cyan-800'
@@ -46,7 +47,8 @@ function MainAppContent() {
       <Header onOpenGuide={() => handleOpenGuide()} />
 
       {/* Main Simulator & Lab Stage Responsive Container */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 md:p-6 overflow-x-hidden">
+      <main id="main-content" className="lab-main flex-1 w-full mx-auto">
+        <LabIntro onOpenGuide={() => handleOpenGuide()} />
         <div className="w-full flex flex-col md:flex-row gap-4 sm:gap-6 overflow-x-hidden">
           <div className="w-full flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden">
             {activeTab === 'atom-builder' && (
