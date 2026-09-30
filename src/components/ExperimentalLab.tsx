@@ -21,7 +21,8 @@ import {
   Layers,
   FileText,
   Clock,
-  Activity
+  Activity,
+  Zap
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -192,6 +193,28 @@ const REAGENTS: LabReagent[] = [
     phValue: 11.5,
     descAr: 'قاعدة مميزة؛ عند إضافتها لمحلول النحاس تحوّله إلى معقد النحاس الأميني الملكي ذو اللون الأزرق النيلي الساحر!',
     descEn: 'Base reagent; reacts with copper to form the stunning deep royal navy tetraamminecopper(II) complex!'
+  },
+  {
+    id: 'sodium_metal',
+    nameAr: 'قطعة صوديوم فلزي نشط',
+    nameEn: 'Active Sodium Metal (Na)',
+    formula: 'Na',
+    type: 'solid',
+    defaultColor: '#e2e8f0',
+    phValue: 14.0,
+    descAr: 'فلز قلوي شديد الفعالية؛ يتفاعل بانفجار فوري مع الماء ويطلق غاز الهيدروجين وحرارة تُحدث فرقعة ولهباً أصفر ساطعاً!',
+    descEn: 'Highly active alkali metal; violently detonates upon contact with water, creating an explosive H2 pop, flame, and heat!'
+  },
+  {
+    id: 'magnesium_ribbon',
+    nameAr: 'شريط مغنيسيوم نقي',
+    nameEn: 'Pure Magnesium Ribbon (Mg)',
+    formula: 'Mg',
+    type: 'solid',
+    defaultColor: '#cbd5e1',
+    phValue: 7.0,
+    descAr: 'فلز مشتعل؛ يحترق بوهج أبيض ناصع باهر وفائق السطوع مطلقاً وميضاً ضوئياً وشرراً متطايراً عند إشعاله أو تسخينه.',
+    descEn: 'Combustible metal; burns with an intensely bright blinding white flare emitting radiant sparks and MgO smoke!'
   }
 ];
 
@@ -211,6 +234,9 @@ interface BeakerContent {
   peroxideMl: number;
   silverNitrateMl: number;
   ammoniaMl: number;
+  sodiumG: number;
+  magnesiumG: number;
+  hydrogenGasMl: number;
 }
 
 export const ExperimentalLab: React.FC = () => {
@@ -226,7 +252,12 @@ export const ExperimentalLab: React.FC = () => {
   const [isThermometerActive, setIsThermometerActive] = useState<boolean>(true);
   const [isPhMeterActive, setIsPhMeterActive] = useState<boolean>(true);
   const [litmusStripDipped, setLitmusStripDipped] = useState<boolean>(false);
-  const [dropperAmount, setDropperAmount] = useState<number>(5); // 1 drop, 5 drops, 15 ml
+  
+  // Precision Dosage & Dispensing Controls (Every single mL controlled freely!)
+  const [dispenseMode, setDispenseMode] = useState<'ml' | 'drop' | 'gram'>('ml');
+  const [dispenseAmountMl, setDispenseAmountMl] = useState<number>(10); // 1-100 mL
+  const [dispenseDrops, setDispenseDrops] = useState<number>(5); // 1-20 drops
+  const [dispenseGrams, setDispenseGrams] = useState<number>(2); // 0.5-25 g
   const [balanceTare, setBalanceTare] = useState<number>(0);
 
   // Beaker Contents State
@@ -245,7 +276,10 @@ export const ExperimentalLab: React.FC = () => {
     permanganateG: 0,
     peroxideMl: 0,
     silverNitrateMl: 0,
-    ammoniaMl: 0
+    ammoniaMl: 0,
+    sodiumG: 0,
+    magnesiumG: 0,
+    hydrogenGasMl: 0
   });
 
   // Physical State of the Liquid in Beaker
@@ -287,8 +321,171 @@ export const ExperimentalLab: React.FC = () => {
     content.calciumChlorideG +
     content.ironG +
     content.precipitateG +
-    content.permanganateG;
+    content.permanganateG +
+    content.sodiumG +
+    content.magnesiumG;
   const displayedWeightG = Math.max(0, rawMassG - balanceTare);
+
+  // Explosion, Combustion & Pour Animation Engine
+  const explosionsRef = useRef<Array<{
+    x: number;
+    y: number;
+    type: 'sodium' | 'magnesium' | 'hydrogen_pop' | 'spark';
+    particles: Array<{
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      color: string;
+      radius: number;
+      life: number;
+      maxLife: number;
+    }>;
+    shockwaveRadius: number;
+    maxShockwaveRadius: number;
+    fireballRadius: number;
+    maxFireballRadius: number;
+    opacity: number;
+  }>>([]);
+  const screenShakeRef = useRef<number>(0);
+  const flashOverlayRef = useRef<{ color: string; opacity: number } | null>(null);
+  const pourAnimationRef = useRef<{
+    active: boolean;
+    color: string;
+    sourceX: number;
+    drops: Array<{ x: number; y: number; vy: number; radius: number }>;
+    progress: number;
+  } | null>(null);
+
+  // Web Audio Synthetic Sound Engine (Client-side, Safe)
+  const playSoundEffect = (type: 'explosion' | 'spark' | 'pour') => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      if (type === 'explosion') {
+        const bufferSize = Math.floor(ctx.sampleRate * 0.42);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.07));
+        }
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(650, ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.4);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.5, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.41);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        noise.start();
+      } else if (type === 'spark') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(1400, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+      } else if (type === 'pour') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(820, ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      }
+    } catch {
+      // Audio playback blocked or unsupported
+    }
+  };
+
+  const triggerExplosion = (type: 'sodium' | 'magnesium' | 'hydrogen_pop' | 'spark') => {
+    playSoundEffect(type === 'spark' ? 'spark' : 'explosion');
+    screenShakeRef.current = type === 'magnesium' ? 7 : type === 'spark' ? 2 : 14;
+    flashOverlayRef.current = {
+      color: type === 'magnesium' ? 'rgba(255, 255, 255, 0.92)' : 'rgba(251, 146, 60, 0.72)',
+      opacity: 1.0
+    };
+
+    const canvas = canvasRef.current;
+    const w = canvas ? canvas.width : 460;
+    const h = canvas ? canvas.height : 345;
+    const cx = w / 2;
+    const cy = h / 2 + 10;
+
+    const count = type === 'magnesium' ? 70 : type === 'sodium' ? 60 : type === 'spark' ? 25 : 45;
+    const palette = type === 'magnesium'
+      ? ['#ffffff', '#f8fafc', '#e2e8f0', '#38bdf8', '#fef08a']
+      : type === 'sodium'
+      ? ['#fef08a', '#f59e0b', '#ef4444', '#f97316', '#ffffff']
+      : type === 'spark'
+      ? ['#38bdf8', '#93c5fd', '#ffffff', '#c084fc']
+      : ['#38bdf8', '#67e8f9', '#ffffff', '#fb923c'];
+
+    const particles = [];
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (type === 'spark' ? 1.5 : 2.5) + Math.random() * (type === 'magnesium' ? 9.5 : 8.0);
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 35,
+        y: cy + (Math.random() - 0.5) * 15,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - (type === 'magnesium' ? 2.5 : 1.5),
+        color: palette[Math.floor(Math.random() * palette.length)],
+        radius: (type === 'spark' ? 1.5 : 2.2) + Math.random() * 3.0,
+        life: 0,
+        maxLife: (type === 'spark' ? 14 : 28) + Math.random() * 30
+      });
+    }
+
+    explosionsRef.current.push({
+      x: cx,
+      y: cy,
+      type,
+      particles,
+      shockwaveRadius: 4,
+      maxShockwaveRadius: type === 'magnesium' ? 95 : type === 'spark' ? 40 : 135,
+      fireballRadius: 8,
+      maxFireballRadius: type === 'magnesium' ? 40 : type === 'spark' ? 15 : 75,
+      opacity: 1.0
+    });
+  };
+
+  const triggerPourAnimation = (color: string) => {
+    playSoundEffect('pour');
+    const canvas = canvasRef.current;
+    const cx = canvas ? canvas.width / 2 : 230;
+    const drops = [];
+    for (let i = 0; i < 5; i++) {
+      drops.push({
+        x: cx - 12 + Math.random() * 24,
+        y: 25 + i * 14,
+        vy: 4.5 + Math.random() * 2.5,
+        radius: 2.5 + Math.random() * 1.5
+      });
+    }
+    pourAnimationRef.current = {
+      active: true,
+      color,
+      sourceX: cx,
+      drops,
+      progress: 0
+    };
+  };
 
   // Chemical Calculation: Net Acid/Base moles and pH
   const netMolesAcid = Math.max(0, content.acidMl * 0.1 - content.baseMl * 0.1 - content.ammoniaMl * 0.06 - content.bakingSodaG * 0.012);
@@ -360,108 +557,204 @@ export const ExperimentalLab: React.FC = () => {
     return theme === 'dark' ? 'rgba(56, 189, 248, 0.28)' : 'rgba(186, 230, 253, 0.55)';
   };
 
-  // Add reagent to beaker
+  // Add reagent to beaker with precise user-controlled volume/dose
   const handleAddReagent = (reagentId: string) => {
-    const amount = dropperAmount;
+    const reg = REAGENTS.find(r => r.id === reagentId);
+    if (!reg) return;
+
+    if (reg.type === 'liquid' || reg.type === 'indicator') {
+      triggerPourAnimation(reg.defaultColor);
+    } else {
+      playSoundEffect('pour');
+    }
+
+    const amountMl = dispenseAmountMl;
+    const drops = dispenseDrops;
+    const grams = dispenseGrams;
 
     setContent(prev => {
       const next = { ...prev };
 
       if (reagentId === 'water') {
-        next.waterMl = Math.min(220, next.waterMl + (amount <= 5 ? 20 : 50));
-        setLastActionMessage(t(`تمت إضافة ${amount <= 5 ? 20 : 50} مل من الماء المقطر.`, `Added ${amount <= 5 ? 20 : 50} mL of distilled water.`));
+        next.waterMl = Math.min(240, next.waterMl + amountMl);
+        // Check if dry sodium is already present in the beaker!
+        if (next.sodiumG > 0) {
+          triggerExplosion('sodium');
+          next.sodiumG = 0;
+          next.baseMl = Math.min(100, next.baseMl + 20);
+          next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + 25);
+          setCurrentTempC(prevT => Math.min(99, prevT + 40));
+          setEffervescenceBubbles(prevB => Math.min(60, prevB + 45));
+          setLastActionMessage(t(`💥 انفجار عنيف! لامس الماء الصوديوم فانفجر بلهب أصفر ساطع، وصدمة انفجارية وغاز هيدروجين!`, `💥 Violent explosion! Water touched sodium, detonating with brilliant yellow flame, shockwave, and H2 gas!`));
+        } else {
+          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من الماء المقطر بدقة.`, `Added precisely ${amountMl} mL of distilled water.`));
+        }
       } else if (reagentId === 'acid_hcl') {
-        next.acidMl = Math.min(80, next.acidMl + amount);
-        // If baking soda is present, trigger vigorous effervescence!
-        if (next.bakingSodaG > 0.5) {
+        next.acidMl = Math.min(100, next.acidMl + amountMl);
+        // If magnesium is present, rapid exothermic reaction with H2 gas!
+        if (next.magnesiumG > 0) {
+          next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + 30);
+          setEffervescenceBubbles(prevB => Math.min(60, prevB + 40));
+          setCurrentTempC(prevT => Math.min(92, prevT + 22));
+          next.magnesiumG = Math.max(0, next.magnesiumG - 2);
+          setLastActionMessage(t(`تفاعل شريط المغنيسيوم مع الحمض بفوران عنيف وتصاعد كثيف لغاز الهيدروجين H₂ القابل للاشتعال!`, `Magnesium reacted vigorously with acid releasing abundant flammable H2 gas!`));
+        } else if (next.bakingSodaG > 0.5) {
           setEffervescenceBubbles(prevB => Math.min(45, prevB + 25));
-          next.bakingSodaG = Math.max(0, next.bakingSodaG - amount * 0.2);
+          next.bakingSodaG = Math.max(0, next.bakingSodaG - amountMl * 0.2);
           setLastActionMessage(t('تفاعل فوران نشط! تفاعل الحمض مع الكربونات وأطلق غاز CO₂ بأمان.', 'Vigorous effervescence! Acid reacted with carbonate releasing CO₂ gas safely.'));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amount} مل من حمض الهيدروكلوريك HCl. انخفضت قيمة pH.`, `Added ${amount} mL dilute HCl. pH decreased.`));
+          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من حمض الهيدروكلوريك HCl. انخفضت قيمة pH.`, `Added precisely ${amountMl} mL dilute HCl. pH decreased.`));
         }
       } else if (reagentId === 'base_naoh') {
-        next.baseMl = Math.min(80, next.baseMl + amount);
-        // If copper sulfate is present, form copper hydroxide precipitate!
+        next.baseMl = Math.min(100, next.baseMl + amountMl);
         if (next.copperSulfateMl > 0) {
-          next.precipitateG = Math.min(25, next.precipitateG + 3.5);
+          next.precipitateG = Math.min(35, next.precipitateG + 4.5);
           setLastActionMessage(t('تفاعل ترسيب! تكوّن راسب أزرق سماوي هلامي من هيدروكسيد النحاس Cu(OH)₂.', 'Precipitation reaction! Sky-blue gelatinous Cu(OH)₂ precipitate formed.'));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amount} مل من هيدروكسيد الصوديوم NaOH. ارتفعت قيمة pH.`, `Added ${amount} mL dilute NaOH. pH increased.`));
+          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من هيدروكسيد الصوديوم NaOH. ارتفعت قيمة pH.`, `Added precisely ${amountMl} mL dilute NaOH. pH increased.`));
         }
       } else if (reagentId === 'copper_sulfate') {
-        next.copperSulfateMl = Math.min(80, next.copperSulfateMl + amount);
-        setLastActionMessage(t(`تمت إضافة ${amount} مل من كبريتات النحاس الزرقاء CuSO₄.`, `Added ${amount} mL of royal blue CuSO₄ solution.`));
+        next.copperSulfateMl = Math.min(100, next.copperSulfateMl + amountMl);
+        setLastActionMessage(t(`تمت إضافة ${amountMl} مل من كبريتات النحاس الزرقاء CuSO₄.`, `Added precisely ${amountMl} mL of royal blue CuSO₄ solution.`));
       } else if (reagentId === 'baking_soda') {
-        next.bakingSodaG = Math.min(30, next.bakingSodaG + (amount <= 5 ? 3 : 8));
-        // If acid present, trigger fizz!
+        next.bakingSodaG = Math.min(40, next.bakingSodaG + grams);
         if (next.acidMl > 0) {
           setEffervescenceBubbles(prevB => Math.min(45, prevB + 30));
           setLastActionMessage(t('فوران فوري وتصاعد فقاعات غاز ثاني أكسيد الكربون (CO₂)!', 'Instant effervescence and CO₂ bubbles streaming upward!'));
         } else {
-          setLastActionMessage(t(`تمت إضافة مسحوق بيكربونات الصوديوم إلى الكأس.`, `Added baking soda powder into the beaker.`));
+          setLastActionMessage(t(`تمت إضافة ${grams} جم مسحوق بيكربونات الصوديوم إلى الكأس.`, `Added ${grams} g baking soda powder into the beaker.`));
         }
       } else if (reagentId === 'calcium_chloride') {
-        next.calciumChlorideG = Math.min(40, next.calciumChlorideG + (amount <= 5 ? 4 : 10));
-        // Strongly exothermic dissolution!
-        setCurrentTempC(prevT => Math.min(85, prevT + (amount <= 5 ? 12 : 24)));
-        setLastActionMessage(t('ذوبان ناشر للحرارة (Exothermic)! ارتفعت درجة حرارة المحلول بسرعة.', 'Exothermic dissolution! Solution temperature surged rapidly.'));
+        next.calciumChlorideG = Math.min(40, next.calciumChlorideG + grams);
+        setCurrentTempC(prevT => Math.min(88, prevT + grams * 3.5));
+        setLastActionMessage(t(`ذوبان ناشر للحرارة (Exothermic)! أُضيف ${grams} جم CaCl₂ وارتفعت الحرارة.`, `Exothermic dissolution! Added ${grams} g CaCl₂ and temperature rose.`));
       } else if (reagentId === 'phenolphthalein') {
-        next.phenolphthaleinDrops += (amount <= 5 ? 3 : 8);
-        setLastActionMessage(t('أُضيفت قطرات كاشف الفينولفثالين. سيتحول للوردي إذا كان الوسط قلوياً (pH > 8.2).', 'Added phenolphthalein indicator drops. Will turn pink in alkaline pH > 8.2.'));
+        next.phenolphthaleinDrops += drops;
+        setLastActionMessage(t(`أُضيفت ${drops} قطرات من كاشف الفينولفثالين. سيتحول للوردي في القلويات (pH > 8.2).`, `Added ${drops} drops of phenolphthalein indicator. Will turn pink in alkaline pH > 8.2.`));
       } else if (reagentId === 'universal_indicator') {
-        next.universalDrops += (amount <= 5 ? 3 : 8);
-        setLastActionMessage(t('أُضيف كاشف الحموضة الشامل. تلوّن المحلول وفق مقياس pH اللوني.', 'Added universal indicator. Liquid colored to match pH spectrum.'));
+        next.universalDrops += drops;
+        setLastActionMessage(t(`أُضيفت ${drops} قطرات من كاشف الحموضة الشامل. تلوّن المحلول وفق مقياس pH.`, `Added ${drops} drops of universal indicator. Colored according to pH.`));
       } else if (reagentId === 'ice_cubes') {
         next.iceCount = Math.min(8, next.iceCount + 2);
         setCurrentTempC(prevT => Math.max(1.0, prevT - 7.5));
         setLastActionMessage(t('أُضيفت مكعبات ثلج. انخفضت درجة حرارة الكأس نحو الصفر المئوي.', 'Added ice cubes. Beaker temperature dropped towards 0 °C.'));
       } else if (reagentId === 'iron_filings') {
-        next.ironG = Math.min(30, next.ironG + 5);
+        next.ironG = Math.min(30, next.ironG + grams);
         if (next.peroxideMl > 0) {
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 30));
           setCurrentTempC(prevT => Math.min(88, prevT + 18));
           setLastActionMessage(t('تحفيز حديدي! قامت برادة الحديد بتفكيك H₂O₂ وتصاعدت فقاعات الأكسجين الساخن.', 'Iron catalysis! Iron filings rapidly catalyzed H₂O₂ into hot oxygen bubbles.'));
         } else {
-          setLastActionMessage(t('أُضيفت برادة حديد داكنة استقرت في قاع الكأس كمادة راسبة.', 'Added iron filings settling at the bottom as insoluble sediment.'));
+          setLastActionMessage(t(`أُضيفت ${grams} جم برادة حديد داكنة استقرت في قاع الكأس كمادة راسبة.`, `Added ${grams} g iron filings settling at the bottom as sediment.`));
         }
       } else if (reagentId === 'potassium_permanganate') {
-        next.permanganateG = Math.min(20, next.permanganateG + (amount <= 5 ? 2 : 6));
+        next.permanganateG = Math.min(25, next.permanganateG + grams);
         if (next.peroxideMl > 0) {
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 40));
           setCurrentTempC(prevT => Math.min(96, prevT + 35));
           setLastActionMessage(t('تفاعل تحفيزي بركاني مهيب! برمنغنات البوتاسيوم فككت ماء الأكسجين وانطلق غاز O₂ وحرارة فائقة!', 'Violent catalytic volcano! KMnO₄ decomposed peroxide into bubbling O₂ and intense heat!'));
         } else {
-          setLastActionMessage(t('أُضيفت بلورات برمنغنات البوتاسيوم KMnO₄ وتلوّن المحلول بالأرجواني الملكي.', 'Added royal purple potassium permanganate KMnO₄ crystals.'));
+          setLastActionMessage(t(`أُضيفت ${grams} جم بلورات برمنغنات البوتاسيوم KMnO₄ وتلوّن المحلول بالأرجواني الملكي.`, `Added ${grams} g royal purple potassium permanganate crystals.`));
         }
       } else if (reagentId === 'hydrogen_peroxide') {
-        next.peroxideMl = Math.min(80, next.peroxideMl + amount);
+        next.peroxideMl = Math.min(100, next.peroxideMl + amountMl);
         if (next.permanganateG > 0 || next.ironG > 0) {
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 35));
           setCurrentTempC(prevT => Math.min(92, prevT + 25));
           setLastActionMessage(t('تفاعل تفكك فوري لماء الأكسجين بفعل المحفز! فقاعات غاز الأكسجين النقي وارتفاع الحرارة.', 'Immediate catalytic peroxide breakdown! Pure O₂ gas foaming and heat surge.'));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amount} مل من فوق أكسيد الهيدروجين H₂O₂ (ماء الأكسجين).`, `Added ${amount} mL of hydrogen peroxide H₂O₂ solution.`));
+          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من فوق أكسيد الهيدروجين H₂O₂ (ماء الأكسجين).`, `Added ${amountMl} mL of hydrogen peroxide H₂O₂ solution.`));
         }
       } else if (reagentId === 'silver_nitrate') {
-        next.silverNitrateMl = Math.min(80, next.silverNitrateMl + amount);
+        next.silverNitrateMl = Math.min(100, next.silverNitrateMl + amountMl);
         if (next.acidMl > 0 || next.calciumChlorideG > 0) {
-          next.precipitateG = Math.min(30, next.precipitateG + 4.5);
+          next.precipitateG = Math.min(35, next.precipitateG + 4.5);
           setLastActionMessage(t('كشف إيجابي عن أيونات الكلوريد! تكوّن راسب كلوريد الفضة AgCl الأبيض الحليبي.', 'Positive chloride test! Dense milky white silver chloride AgCl precipitate formed.'));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amount} مل من نترات الفضة AgNO₃.`, `Added ${amount} mL of silver nitrate AgNO₃.`));
+          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من نترات الفضة AgNO₃.`, `Added ${amountMl} mL of silver nitrate AgNO₃.`));
         }
       } else if (reagentId === 'ammonia_solution') {
-        next.ammoniaMl = Math.min(80, next.ammoniaMl + amount);
+        next.ammoniaMl = Math.min(100, next.ammoniaMl + amountMl);
         if (next.copperSulfateMl > 0) {
           setLastActionMessage(t('تكوّن معقد النحاس الرباعي الأميني الملكي [Cu(NH₃)₄]²⁺ بلون أزرق نيلي ساحر!', 'Formed royal dark navy tetraamminecopper(II) complex [Cu(NH₃)₄]²⁺!'));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amount} مل من محلول الأمونيا NH₄OH (ارتفعت قلوية المحلول pH).`, `Added ${amount} mL of ammonia solution NH₄OH (pH increased).`));
+          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من محلول الأمونيا NH₄OH (ارتفعت قلوية المحلول pH).`, `Added ${amountMl} mL of ammonia solution NH₄OH (pH increased).`));
+        }
+      } else if (reagentId === 'sodium_metal') {
+        // Metallic Sodium Addition
+        if (next.waterMl > 0) {
+          // Instant violent detonation!
+          triggerExplosion('sodium');
+          next.sodiumG = 0;
+          next.baseMl = Math.min(100, next.baseMl + grams * 5); // strong NaOH production
+          next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + grams * 6); // H2 gas release
+          setCurrentTempC(prevT => Math.min(99, prevT + grams * 18));
+          setEffervescenceBubbles(prevB => Math.min(60, prevB + 45));
+          setLastActionMessage(t('💥 انفجار تفاعل الصوديوم الفلزي مع الماء! تفاعل فوري طارد للحرارة مع اشتعال الهيدروجين بلهب أصفر ساطع وتطاير الشرر!', '💥 Violent Sodium-Water Explosion! Exothermic detonation releasing flaming H2 gas with brilliant yellow sparks!'));
+        } else {
+          next.sodiumG = Math.min(20, next.sodiumG + grams);
+          setLastActionMessage(t(`أُضيفت ${grams} جم قطعة صوديوم فلزي نقية استقرت في الكأس الجاف. أضف الماء لمشاهدة الانفجار الفوري!`, `Added ${grams} g active sodium metal to dry beaker. Add water to trigger detonation!`));
+        }
+      } else if (reagentId === 'magnesium_ribbon') {
+        // Magnesium Ribbon Addition
+        next.magnesiumG = Math.min(25, next.magnesiumG + grams);
+        if (burnerPower !== 'off' || currentTempC >= 70) {
+          // Intense combustion flare!
+          triggerExplosion('magnesium');
+          next.magnesiumG = 0;
+          next.precipitateG = Math.min(40, next.precipitateG + grams * 2.5); // MgO white ash
+          setCurrentTempC(prevT => Math.min(99, prevT + 38));
+          setLastActionMessage(t('🔥 وميض ساطع مهيب! اشتعل شريط المغنيسيوم بوهج أبيض فائق السطوع يحاكي احتراق الألعاب النارية!', '🔥 Blinding white magnesium combustion flare! Emitted radiant sparks and white MgO ash!'));
+        } else if (next.acidMl > 0) {
+          next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + grams * 7);
+          setEffervescenceBubbles(prevB => Math.min(60, prevB + 40));
+          setCurrentTempC(prevT => Math.min(90, prevT + 18));
+          setLastActionMessage(t('تفاعل شريط المغنيسيوم مع الحمض بفوران سريع وتصاعد كثيف لغاز الهيدروجين H₂ القابل للاشتعال!', 'Magnesium reacted with acid releasing rapid fizzing and flammable hydrogen H2 gas!'));
+        } else {
+          setLastActionMessage(t(`أُضيف ${grams} جم شريط مغنيسيوم نقي إلى الكأس. أشعل موقد بنزن أو أطلق الشرارة الكهربائية لإشعاله بوهج أبيض!`, `Added ${grams} g magnesium ribbon. Ignite burner or electric spark to trigger white flare!`));
         }
       }
 
       return next;
     });
+  };
+
+  // Electric Spark / Igniter Tool
+  const handleIgniteSpark = () => {
+    triggerExplosion('spark');
+
+    // If magnesium is present in the beaker, ignite it with blinding flare!
+    if (content.magnesiumG > 0) {
+      setTimeout(() => {
+        triggerExplosion('magnesium');
+        setContent(prev => ({
+          ...prev,
+          magnesiumG: 0,
+          precipitateG: Math.min(35, prev.precipitateG + 4.0)
+        }));
+        setCurrentTempC(prevT => Math.min(99, prevT + 36));
+        setLastActionMessage(t('🔥 وميض أبيض ناصع باهر! أطلقت الشرارة اشتعال شريط المغنيسيوم بالوهج الشمسي الأبيض الناصع!', '🔥 Blinding white flare! Electric spark ignited magnesium ribbon into radiant sparks and white MgO ash!'));
+      }, 120);
+      return;
+    }
+
+    // If flammable hydrogen gas has accumulated, trigger explosive pop detonation!
+    if (content.hydrogenGasMl > 0) {
+      setTimeout(() => {
+        triggerExplosion('hydrogen_pop');
+        setContent(prev => ({
+          ...prev,
+          hydrogenGasMl: 0,
+          waterMl: Math.min(240, prev.waterMl + 2)
+        }));
+        setCurrentTempC(prevT => Math.min(95, prevT + 20));
+        setEffervescenceBubbles(0);
+        setLastActionMessage(t('⚡ فرقعة انفجارية سريعة لغاز الهيدروجين (Pop Test)! تفاعل الهيدروجين مع الأكسجين مكوناً بخار ماء مع صوت فرقعة ممتع!', '⚡ Explosive Hydrogen Pop Test! Flammable H2 detonated with O2 forming water vapor and a loud exciting pop!'));
+      }, 120);
+      return;
+    }
+
+    setLastActionMessage(t('⚡ انطلقت شرارة كهربائية تجريبية داخل الكأس. لا توجد غازات أو أشرطة قابلة للاشتعال حالياً.', '⚡ Electric test spark struck inside beaker. No combustible gases or metals present currently.'));
   };
 
   // Stir the mixture with the glass rod
@@ -495,8 +788,14 @@ export const ExperimentalLab: React.FC = () => {
       permanganateG: 0,
       peroxideMl: 0,
       silverNitrateMl: 0,
-      ammoniaMl: 0
+      ammoniaMl: 0,
+      sodiumG: 0,
+      magnesiumG: 0,
+      hydrogenGasMl: 0
     });
+    explosionsRef.current = [];
+    pourAnimationRef.current = null;
+    flashOverlayRef.current = null;
     setBurnerPower('off');
     setCurrentTempC(23.5);
     setEffervescenceBubbles(0);
@@ -613,6 +912,30 @@ export const ExperimentalLab: React.FC = () => {
       goalAr: 'أضف كبريتات النحاس الزرقاء CuSO₄ ثم أضف محلول الأمونيا NH₄OH لتشاهد تحول اللون إلى الأزرق النيلي الساحر لمعقد النحاس الملكي!',
       goalEn: 'Add blue CuSO₄ then add ammonia NH₄OH to watch the liquid turn into an intense deep royal navy blue complex!',
       isSatisfied: (c: BeakerContent) => c.copperSulfateMl > 5 && c.ammoniaMl > 5
+    },
+    {
+      id: 'mission_sodium_explosion',
+      titleAr: '💥 انفجار وتفاعل الصوديوم الفلزي مع الماء',
+      titleEn: '💥 Violent Sodium Metal Water Detonation',
+      goalAr: 'ضع 100 مل ماء مقطر، ثم أضف قطعة من الصوديوم الفلزي النشط Na لمشاهدة الانفجار الفوري وتطاير الشرر واللهب الأصفر وتصاعد غاز الهيدروجين!',
+      goalEn: 'Add 100 mL water, then drop active sodium metal Na to witness the explosive detonation, sparks, and brilliant flame!',
+      isSatisfied: (c: BeakerContent, ph: number) => c.waterMl > 20 && ph > 11.0 && effervescenceBubbles > 5
+    },
+    {
+      id: 'mission_magnesium_flare',
+      titleAr: '🔥 احتراق شريط المغنيسيوم بالوهج الأبيض الساطع',
+      titleEn: '🔥 Blinding White Magnesium Ribbon Flare',
+      goalAr: 'أضف شريط المغنيسيوم Mg وشغّل موقد بنزن أو أطلق الشرارة الكهربائية لمشاهدة الوميض الأبيض فائق التوهج وتصاعد دخان أكسيد المغنيسيوم الأبيض!',
+      goalEn: 'Add magnesium ribbon Mg then ignite burner or electric spark to trigger the blinding white fireworks-like combustion flare!',
+      isSatisfied: (c: BeakerContent) => (c.precipitateG > 0 || c.magnesiumG > 0) && currentTempC > 50
+    },
+    {
+      id: 'mission_hydrogen_pop',
+      titleAr: '⚡ اختبار فرقعة غاز الهيدروجين النقي (Pop Test)',
+      titleEn: '⚡ Pure Hydrogen Gas Pop Detonation Test',
+      goalAr: 'أنتج غاز الهيدروجين بتفاعل الصوديوم مع الماء أو المغنيسيوم مع الحمض، ثم أطلق شرارة الإشعال الكهربائية لسماع فرقعة انفجار الهيدروجين الشهيرة!',
+      goalEn: 'Produce hydrogen gas from sodium or magnesium, then strike the electric spark to trigger the famous explosive Pop detonation!',
+      isSatisfied: (c: BeakerContent) => (c.waterMl > 0 || c.acidMl > 0) && effervescenceBubbles > 0
     }
   ];
 
@@ -640,6 +963,15 @@ export const ExperimentalLab: React.FC = () => {
     const render = () => {
       if (!isRunning) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      // Screen shake translation on detonation
+      if (screenShakeRef.current > 0) {
+        const sx = (Math.random() - 0.5) * screenShakeRef.current;
+        const sy = (Math.random() - 0.5) * screenShakeRef.current;
+        ctx.translate(sx, sy);
+        screenShakeRef.current = Math.max(0, screenShakeRef.current - 0.7);
+      }
 
       const w = canvas.width;
       const h = canvas.height;
@@ -915,6 +1247,133 @@ export const ExperimentalLab: React.FC = () => {
         ctx.fillRect(stripX, liquidSurfaceY, 8, beakerBottomY - liquidSurfaceY - 30);
       }
 
+      // 7. POURING STREAM & FALLING DROPLETS ANIMATION
+      if (pourAnimationRef.current && pourAnimationRef.current.active) {
+        const pour = pourAnimationRef.current;
+        pour.progress += 0.05;
+
+        // Pipette tip at beaker top
+        ctx.fillStyle = theme === 'dark' ? '#64748b' : '#94a3b8';
+        ctx.beginPath();
+        ctx.moveTo(pour.sourceX - 8, 8);
+        ctx.lineTo(pour.sourceX + 8, 8);
+        ctx.lineTo(pour.sourceX + 3.5, 34);
+        ctx.lineTo(pour.sourceX - 3.5, 34);
+        ctx.closePath();
+        ctx.fill();
+
+        // Droplets
+        ctx.fillStyle = pour.color;
+        for (const drop of pour.drops) {
+          drop.y += drop.vy;
+          ctx.beginPath();
+          ctx.arc(drop.x, drop.y, drop.radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Ripple upon striking fluid
+        if (totalVolumeMl > 0) {
+          ctx.strokeStyle = pour.color;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.ellipse(pour.sourceX, liquidSurfaceY, 15 * Math.min(1, pour.progress * 1.5), 4 * Math.min(1, pour.progress * 1.5), 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        if (pour.progress >= 1.0) {
+          pourAnimationRef.current = null;
+        }
+      }
+
+      // 8. ACTIVE EXPLOSIONS, COMBUSTION FLARES & SPARKS
+      for (let eIdx = explosionsRef.current.length - 1; eIdx >= 0; eIdx--) {
+        const exp = explosionsRef.current[eIdx];
+
+        // Expanding Shockwave Ring
+        if (exp.shockwaveRadius < exp.maxShockwaveRadius) {
+          exp.shockwaveRadius += 4.5;
+          const swAlpha = Math.max(0, 1 - exp.shockwaveRadius / exp.maxShockwaveRadius);
+          ctx.beginPath();
+          ctx.arc(exp.x, exp.y, exp.shockwaveRadius, 0, Math.PI * 2);
+          ctx.strokeStyle = exp.type === 'magnesium'
+            ? `rgba(255, 255, 255, ${swAlpha * 0.95})`
+            : `rgba(251, 146, 60, ${swAlpha * 0.85})`;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+
+        // Expanding Fireball Plasma Puff
+        if (exp.fireballRadius < exp.maxFireballRadius) {
+          exp.fireballRadius += 2.8;
+          const fbAlpha = Math.max(0, 1 - exp.fireballRadius / exp.maxFireballRadius);
+          const fireGrad = ctx.createRadialGradient(
+            exp.x, exp.y, 2,
+            exp.x, exp.y, exp.fireballRadius
+          );
+          if (exp.type === 'magnesium') {
+            fireGrad.addColorStop(0, `rgba(255, 255, 255, ${fbAlpha})`);
+            fireGrad.addColorStop(0.4, `rgba(224, 242, 254, ${fbAlpha * 0.8})`);
+            fireGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+          } else {
+            fireGrad.addColorStop(0, `rgba(255, 255, 255, ${fbAlpha})`);
+            fireGrad.addColorStop(0.3, `rgba(254, 240, 138, ${fbAlpha * 0.9})`);
+            fireGrad.addColorStop(0.7, `rgba(249, 115, 22, ${fbAlpha * 0.7})`);
+            fireGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+          }
+          ctx.beginPath();
+          ctx.arc(exp.x, exp.y, exp.fireballRadius, 0, Math.PI * 2);
+          ctx.fillStyle = fireGrad;
+          ctx.fill();
+        }
+
+        // Flying Incandescent Spark Particles
+        for (let pIdx = exp.particles.length - 1; pIdx >= 0; pIdx--) {
+          const p = exp.particles[pIdx];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += 0.16; // gravity
+          p.life++;
+
+          // Wall bounce inside beaker
+          if (p.x < beakerX + 8 || p.x > beakerX + beakerW - 8) {
+            p.vx = -p.vx * 0.55;
+          }
+
+          const pAlpha = Math.max(0, 1 - p.life / p.maxLife);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = pAlpha;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = exp.type === 'magnesium' ? 10 : 6;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1.0;
+
+          if (p.life >= p.maxLife) {
+            exp.particles.splice(pIdx, 1);
+          }
+        }
+
+        if (exp.particles.length === 0 && exp.shockwaveRadius >= exp.maxShockwaveRadius && exp.fireballRadius >= exp.maxFireballRadius) {
+          explosionsRef.current.splice(eIdx, 1);
+        }
+      }
+
+      // 9. FLASH OVERLAY (Camera Flash on Detonation)
+      if (flashOverlayRef.current && flashOverlayRef.current.opacity > 0) {
+        ctx.fillStyle = flashOverlayRef.current.color;
+        ctx.globalAlpha = flashOverlayRef.current.opacity;
+        ctx.fillRect(0, 0, w, h);
+        ctx.globalAlpha = 1.0;
+        flashOverlayRef.current.opacity -= 0.08;
+        if (flashOverlayRef.current.opacity <= 0) {
+          flashOverlayRef.current = null;
+        }
+      }
+
+      ctx.restore(); // ends screen shake translation
+
       animId = requestAnimationFrame(render);
     };
 
@@ -1051,31 +1510,166 @@ export const ExperimentalLab: React.FC = () => {
               <span className="text-[11px] font-mono text-cyan-400 font-bold">{REAGENTS.length} {t('مواد آمنة', 'Safe Items')}</span>
             </div>
 
-            {/* Dropper / Pipette Dosage Control */}
-            <div className={`p-3 rounded-xl border space-y-1.5 ${
-              isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+            {/* Precision Volume & Dosage Dispenser Deck (Full Freedom per mL) */}
+            <div className={`p-3.5 rounded-xl border space-y-3 ${
+              isDark ? 'bg-slate-950/70 border-cyan-900/50' : 'bg-cyan-50/50 border-cyan-200'
             }`}>
-              <div className="flex justify-between items-center text-xs font-semibold text-slate-400">
-                <span>{t('عيار القطارة / الإضافة:', 'Pipette / Addition Dose:')}</span>
-                <span className="font-mono text-cyan-400 font-bold">
-                  {dropperAmount === 1 ? t('قطرة واحدة (0.5 مل)', '1 Drop (0.5 mL)') : dropperAmount === 5 ? t('5 قطرات (2.5 مل)', '5 Drops (2.5 mL)') : t('صب مباشر (15 مل)', 'Pour (15 mL)')}
+              {/* Header and Mode Selector */}
+              <div className="flex items-center justify-between gap-1 flex-wrap">
+                <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>{t('وحدة التحكم الدقيق بالحجم والجرعات', 'Precision Dosage Station')}</span>
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-950/60 border border-cyan-700/40 text-cyan-300 font-mono font-bold">
+                  {dispenseMode === 'ml' ? `${dispenseAmountMl} mL` : dispenseMode === 'drop' ? `${dispenseDrops} drops` : `${dispenseGrams} g`}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[1, 5, 15].map(amt => (
-                  <button
-                    key={amt}
-                    onClick={() => setDropperAmount(amt)}
-                    className={`py-1.5 px-2 rounded-lg border text-xs font-bold transition-all ${
-                      dropperAmount === amt
-                        ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm'
-                        : isDark ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    {amt === 1 ? t('1 قطرة', '1 Drop') : amt === 5 ? t('5 قطرات', '5 Drops') : t('15 مل صب', '15 mL')}
-                  </button>
-                ))}
+
+              {/* Dispense Mode Tabs */}
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-slate-900/80 border border-slate-800 text-[11px] font-bold">
+                <button
+                  onClick={() => setDispenseMode('ml')}
+                  className={`py-1 rounded transition-all ${
+                    dispenseMode === 'ml' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  💧 {t('مليلتر (mL)', 'mL Mode')}
+                </button>
+                <button
+                  onClick={() => setDispenseMode('drop')}
+                  className={`py-1 rounded transition-all ${
+                    dispenseMode === 'drop' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🧪 {t('قطرات', 'Drops')}
+                </button>
+                <button
+                  onClick={() => setDispenseMode('gram')}
+                  className={`py-1 rounded transition-all ${
+                    dispenseMode === 'gram' ? 'bg-cyan-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ⚖️ {t('غرامات (g)', 'Grams')}
+                </button>
               </div>
+
+              {/* Mode-Specific Precise Inputs */}
+              {dispenseMode === 'ml' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-400">{t('تحكم بكل مليلتر (1 - 100 مل):', 'Control every mL (1-100 mL):')}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setDispenseAmountMl(m => Math.max(1, m - 5))}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[10px]"
+                      >
+                        -5
+                      </button>
+                      <button
+                        onClick={() => setDispenseAmountMl(m => Math.max(1, m - 1))}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[10px]"
+                      >
+                        -1
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={dispenseAmountMl}
+                        onChange={(e) => setDispenseAmountMl(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+                        className="w-14 text-center font-mono font-black text-cyan-400 bg-slate-900 border border-cyan-500/50 rounded py-0.5 text-xs focus:outline-none focus:border-cyan-400"
+                      />
+                      <button
+                        onClick={() => setDispenseAmountMl(m => Math.min(100, m + 1))}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[10px]"
+                      >
+                        +1
+                      </button>
+                      <button
+                        onClick={() => setDispenseAmountMl(m => Math.min(100, m + 5))}
+                        className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[10px]"
+                      >
+                        +5
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Free Range Slider for ML */}
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={dispenseAmountMl}
+                    onChange={(e) => setDispenseAmountMl(parseInt(e.target.value))}
+                    className="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer accent-cyan-500"
+                  />
+
+                  {/* Quick ML Presets */}
+                  <div className="grid grid-cols-6 gap-1 pt-0.5">
+                    {[1, 2, 5, 10, 25, 50].map(amt => (
+                      <button
+                        key={amt}
+                        onClick={() => setDispenseAmountMl(amt)}
+                        className={`py-1 rounded text-[10px] font-mono font-bold border transition-all ${
+                          dispenseAmountMl === amt
+                            ? 'bg-cyan-600 text-white border-cyan-400 shadow-sm'
+                            : isDark ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {amt}ml
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {dispenseMode === 'drop' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs text-slate-400">
+                    <span>{t('عدد القطرات الدقيقة:', 'Drop count:')}</span>
+                    <span className="font-mono text-cyan-400 font-bold">{dispenseDrops} {t('قطرات', 'drops')}</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[1, 2, 3, 5, 10].map(d => (
+                      <button
+                        key={d}
+                        onClick={() => setDispenseDrops(d)}
+                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                          dispenseDrops === d
+                            ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm'
+                            : isDark ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {d} {d === 1 ? t('قطرة', 'drop') : t('قطرات', 'drops')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {dispenseMode === 'gram' && (
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs text-slate-400">
+                    <span>{t('كتلة المسحوق / الفلز:', 'Powder / Metal Mass:')}</span>
+                    <span className="font-mono text-cyan-400 font-bold">{dispenseGrams} {t('جرام', 'g')}</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[0.5, 1, 2, 5, 10].map(g => (
+                      <button
+                        key={g}
+                        onClick={() => setDispenseGrams(g)}
+                        className={`py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                          dispenseGrams === g
+                            ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm'
+                            : isDark ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {g}g
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Chemical Reagents Shelf Buttons */}
@@ -1168,7 +1762,7 @@ export const ExperimentalLab: React.FC = () => {
             </div>
 
             {/* Tools Rack Controls under Beaker */}
-            <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+            <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-4">
               {/* Bunsen Burner Power Toggle */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-slate-400 font-bold block">{t('موقد بنزن:', 'Bunsen Burner:')}</span>
@@ -1186,6 +1780,23 @@ export const ExperimentalLab: React.FC = () => {
                 >
                   <Flame className={`w-3.5 h-3.5 ${burnerPower !== 'off' ? 'animate-bounce' : ''}`} />
                   <span>{burnerPower === 'off' ? t('تشغيل الموقد', 'Burner Off') : `${burnerPower.toUpperCase()} 🔥`}</span>
+                </button>
+              </div>
+
+              {/* Electric Spark / Combustion Igniter */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold block">{t('قادح الإشعال:', 'Spark Igniter:')}</span>
+                <button
+                  onClick={handleIgniteSpark}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    content.hydrogenGasMl > 0 || content.magnesiumG > 0
+                      ? 'bg-amber-600 border-amber-400 text-white shadow-md shadow-amber-500/30 animate-pulse'
+                      : isDark ? 'bg-slate-950 border-slate-800 text-amber-400 hover:bg-slate-900' : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
+                  }`}
+                  title={t('إطلاق شرارة كهربائية لاختبار الاشتعال وتفجير الغازات', 'Strike spark to ignite combustible gas or magnesium')}
+                >
+                  <Zap className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                  <span>{t('شرارة إشعال ⚡', 'Spark ⚡')}</span>
                 </button>
               </div>
 

@@ -9,7 +9,8 @@ import {
   Zap,
   Info,
   ChevronDown,
-  BookOpen
+  BookOpen,
+  Compass
 } from 'lucide-react';
 import { ALL_ELEMENTS, ELEMENT_MAP, ElementInfo, CATEGORY_COLORS } from '../data/elementsData';
 import { getElementDescription } from '../data/elementDescriptionsEn';
@@ -37,6 +38,8 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   const [electrons, setElectrons] = useState<number>(1);
   const [isPeriodicTableOpen, setIsPeriodicTableOpen] = useState<boolean>(false);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [showSpinArrows, setShowSpinArrows] = useState<boolean>(true);
+  const [orbitSpeed, setOrbitSpeed] = useState<number>(1.0); // 0 (pause), 0.3 (slow motion), 1.0 (normal), 1.6 (fast)
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const nucleusNodesRef = useRef<NucleusNode[]>([]);
@@ -298,29 +301,97 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         }
       });
 
-      // Update Orbital Angles & Draw Orbiting Electrons
+      // Update Orbital Angles & Draw Orbiting Electrons (Pauli Principle: Alternating Directions & Spins)
       for (let i = 0; i < 7; i++) {
         if (shells[i] > 0) {
-          const speed = 0.038 / (i + 1);
+          const speed = (0.038 / (i + 1)) * orbitSpeed;
           shellAnglesRef.current[i] += speed * shellDirs[i];
 
           const numE = shells[i];
           const r = shellRadii[i];
 
           for (let e = 0; e < numE; e++) {
-            const theta = shellAnglesRef.current[i] + e * ((Math.PI * 2) / numE);
+            // Pauli Exclusion Principle: Paired electrons in an orbital have opposite spins and directions!
+            const isSpinUp = (e % 2 === 0);
+            const spinSign = isSpinUp ? 1 : -1;
+            const eDirection = spinSign * shellDirs[i];
+
+            // Counter-rotating or alternating directional phase
+            const baseTheta = e * ((Math.PI * 2) / numE);
+            const theta = baseTheta + (shellAnglesRef.current[i] * spinSign);
+
             const ex = cx + Math.cos(theta) * r;
             const ey = cy + Math.sin(theta) * r;
 
             const electronGrad = ctx.createRadialGradient(ex - 1.5, ey - 1.5, 0.5, ex, ey, 4.5);
-            electronGrad.addColorStop(0, '#bae6fd');
-            electronGrad.addColorStop(0.4, '#38bdf8');
-            electronGrad.addColorStop(1, '#0284c7');
+            if (isSpinUp) {
+              electronGrad.addColorStop(0, '#bae6fd');
+              electronGrad.addColorStop(0.4, '#38bdf8');
+              electronGrad.addColorStop(1, '#0284c7');
+            } else {
+              electronGrad.addColorStop(0, '#fed7aa');
+              electronGrad.addColorStop(0.4, '#fb923c');
+              electronGrad.addColorStop(1, '#ea580c');
+            }
+
+            // Directional Orbital Motion Arrow & Spin Badge (↑ / ↓)
+            if (showSpinArrows) {
+              const arrowArcSpan = 0.28; // radian arc ahead of electron
+              const startArc = theta + (eDirection > 0 ? 0.07 : -0.07);
+              const endArc = theta + (eDirection > 0 ? arrowArcSpan : -arrowArcSpan);
+
+              // Curved arc along orbit path
+              ctx.beginPath();
+              ctx.arc(cx, cy, r, startArc, endArc, eDirection < 0);
+              ctx.strokeStyle = isSpinUp ? 'rgba(56, 189, 248, 0.95)' : 'rgba(251, 146, 60, 0.95)';
+              ctx.lineWidth = 2.2;
+              ctx.stroke();
+
+              // Arrowhead pointing in orbital velocity direction
+              const tipX = cx + Math.cos(endArc) * r;
+              const tipY = cy + Math.sin(endArc) * r;
+              const tangentAngle = endArc + (eDirection > 0 ? Math.PI / 2 : -Math.PI / 2);
+              const headLen = 6.5;
+
+              ctx.beginPath();
+              ctx.moveTo(tipX, tipY);
+              ctx.lineTo(
+                tipX - headLen * Math.cos(tangentAngle - Math.PI / 5.2),
+                tipY - headLen * Math.sin(tangentAngle - Math.PI / 5.2)
+              );
+              ctx.moveTo(tipX, tipY);
+              ctx.lineTo(
+                tipX - headLen * Math.cos(tangentAngle + Math.PI / 5.2),
+                tipY - headLen * Math.sin(tangentAngle + Math.PI / 5.2)
+              );
+              ctx.strokeStyle = isSpinUp ? '#38bdf8' : '#fb923c';
+              ctx.lineWidth = 2.2;
+              ctx.stroke();
+
+              // Spin Orientation Badge (↑ Spin Up / ↓ Spin Down)
+              const badgeRadius = r + 13.5;
+              const badgeX = cx + Math.cos(theta) * badgeRadius;
+              const badgeY = cy + Math.sin(theta) * badgeRadius;
+
+              ctx.beginPath();
+              ctx.arc(badgeX, badgeY, 7, 0, Math.PI * 2);
+              ctx.fillStyle = isSpinUp ? 'rgba(8, 47, 73, 0.92)' : 'rgba(67, 20, 7, 0.92)';
+              ctx.fill();
+              ctx.strokeStyle = isSpinUp ? '#38bdf8' : '#fb923c';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+
+              ctx.fillStyle = '#ffffff';
+              ctx.font = 'bold 9px Cairo, Arial, sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(isSpinUp ? '↑' : '↓', badgeX, badgeY + 0.5);
+            }
 
             // Aura
             ctx.beginPath();
-            ctx.arc(ex, ey, 7.5, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+            ctx.arc(ex, ey, 8, 0, Math.PI * 2);
+            ctx.fillStyle = isSpinUp ? 'rgba(56, 189, 248, 0.25)' : 'rgba(251, 146, 60, 0.25)';
             ctx.fill();
 
             // Core
@@ -339,6 +410,30 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         }
       }
 
+      // On-Canvas Spin Legend Box when arrows are shown
+      if (showSpinArrows && electrons > 0) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(10, 10, 156, 44, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.font = 'bold 9.5px Cairo, sans-serif';
+        ctx.textAlign = 'right';
+
+        // Up Spin
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText('↑ غزل للأعلى (+½) عكس عقارب', 158, 25);
+
+        // Down Spin
+        ctx.fillStyle = '#fb923c';
+        ctx.fillText('↓ غزل للأسفل (-½) مع عقارب', 158, 43);
+        ctx.restore();
+      }
+
       animationFrameIdRef.current = requestAnimationFrame(render);
     };
 
@@ -350,7 +445,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
     };
-  }, [protons, neutrons, electrons, isStable, currentElement]);
+  }, [protons, neutrons, electrons, isStable, currentElement, showSpinArrows, orbitSpeed]);
 
   const loadElement = (el: ElementInfo) => {
     setProtons(el.atomicNumber);
@@ -672,6 +767,94 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
               <span className="text-cyan-400 cursor-pointer hover:underline" onClick={() => setIsPeriodicTableOpen(true)}>
                 {t('تصفح كافة العناصر (118)', 'Explore all 118 elements')}
               </span>
+            </div>
+          </div>
+
+          {/* Teacher Guidance & Pauli Exclusion / Electron Spin Card */}
+          <div className={`w-full p-3.5 sm:p-4 rounded-2xl border space-y-3 shadow-md ${
+            isDark ? 'bg-slate-900/90 border-cyan-800/40' : 'bg-cyan-50/50 border-cyan-200'
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-cyan-400" />
+                <h4 className={`text-xs font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {t('توجيه المعلم: حركة واتجاه دوران الإلكترونات واللف المغزلي', 'Teacher Rule: Opposite Electron Motion & Spin Vectors')}
+                </h4>
+              </div>
+              <button
+                onClick={() => setShowSpinArrows(!showSpinArrows)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 self-start sm:self-auto ${
+                  showSpinArrows
+                    ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm'
+                    : isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-200 text-slate-700 border-slate-300'
+                }`}
+              >
+                <span>{showSpinArrows ? '✓ ' + t('الأسهم مفعلة', 'Arrows Active') : t('إظهار الأسهم', 'Show Arrows')}</span>
+              </button>
+            </div>
+
+            {/* Pedagogical Explanation Text */}
+            <p className="text-[11px] leading-relaxed text-slate-300">
+              {t(
+                '💡 وفقاً لملاحظة المعلم وقوانين ميكانيكا الكم (مبدأ باولي للاستبعاد): لا تدور الإلكترونات في نفس الاتجاه في المدار الواحد! كل زوج من الإلكترونات يدور في اتجاهين متعاكسين بلف مغزلي متعاكس (سماوي عكس عقارب الساعة ↑، وبرتقالي مع عقارب الساعة ↓) لتوليد مجالين مغناطيسيين متعاكسين يقللان التنافر ويحققان الاستقرار.',
+                '💡 Per teacher’s rule and Pauli Exclusion Principle: Electrons do NOT rotate in the same direction in an orbit! Paired electrons orbit in opposite directions with opposite spins (Cyan counter-clockwise ↑, Orange clockwise ↓) generating opposing magnetic moments that minimize repulsion and stabilize the atom.'
+              )}
+            </p>
+
+            {/* Orbital Motion Speed Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <span className="text-[11px] text-slate-400 font-semibold">{t('سرعة الدوران:', 'Orbit Speed:')}</span>
+              <div className="flex items-center gap-1">
+                {[
+                  { label: t('⏸️ تجميد لدراسة الاتجاه', '⏸️ Pause'), speed: 0 },
+                  { label: t('🐢 0.3x بطيء', '🐢 0.3x'), speed: 0.3 },
+                  { label: t('▶️ 1.0x عادي', '▶️ 1.0x'), speed: 1.0 },
+                  { label: t('⚡ 1.6x سريع', '⚡ 1.6x'), speed: 1.6 },
+                ].map(btn => (
+                  <button
+                    key={btn.speed}
+                    onClick={() => setOrbitSpeed(btn.speed)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                      orbitSpeed === btn.speed
+                        ? 'bg-cyan-600 text-white border-cyan-400 shadow-sm'
+                        : isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white' : 'bg-white border-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Electron Spin Up & Down Distribution Badges */}
+            <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+              <div className={`p-2 rounded-xl border flex items-center gap-2 ${
+                isDark ? 'bg-slate-950/70 border-sky-900/60' : 'bg-sky-50 border-sky-200'
+              }`}>
+                <span className="w-6 h-6 rounded-lg bg-sky-950/80 border border-sky-500/50 flex items-center justify-center text-sky-400 font-bold text-xs shrink-0">
+                  ↑
+                </span>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t('لف مغزلي للأعلى (+½)', 'Spin-Up (+½)')}</span>
+                  <span className="text-xs font-mono font-bold text-sky-400">
+                    {Math.ceil(electrons / 2)} {t('إلكترون (سماوي)', 'electrons')}
+                  </span>
+                </div>
+              </div>
+
+              <div className={`p-2 rounded-xl border flex items-center gap-2 ${
+                isDark ? 'bg-slate-950/70 border-orange-900/60' : 'bg-orange-50 border-orange-200'
+              }`}>
+                <span className="w-6 h-6 rounded-lg bg-orange-950/80 border border-orange-500/50 flex items-center justify-center text-orange-400 font-bold text-xs shrink-0">
+                  ↓
+                </span>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">{t('لف مغزلي للأسفل (-½)', 'Spin-Down (-½)')}</span>
+                  <span className="text-xs font-mono font-bold text-orange-400">
+                    {Math.floor(electrons / 2)} {t('إلكترون (برتقالي)', 'electrons')}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

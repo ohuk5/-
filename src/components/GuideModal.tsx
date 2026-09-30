@@ -632,6 +632,30 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                     )}
                   </p>
                 </div>
+
+                {/* Teacher's Note: Electron Spin & Opposite Motion Direction (Pauli Exclusion) */}
+                <div className={`p-4 rounded-xl border space-y-2 ${isDark ? 'bg-cyan-950/30 border-cyan-500/40' : 'bg-cyan-50/70 border-cyan-300'}`}>
+                  <h5 className="font-bold text-sm text-cyan-400 flex items-center gap-2">
+                    <Compass className="w-4 h-4" />
+                    <span>{t('توجيه المعلم: لماذا لا تدور الإلكترونات في نفس الاتجاه؟ (مبدأ باولي واللف المغزلي)', 'Teacher Rule: Why Electrons Orbit in Opposite Directions (Pauli Exclusion & Spin)')}</span>
+                  </h5>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {t(
+                      'في المدار الواحد لا تدور الإلكترونات في نفس الاتجاه أبداً! وفقاً لمبدأ باولي للاستبعاد وقواعد ميكانيكا الكم، الإلكترونات جسيمات سالبة تتنافر كهربائياً ومغناطيسياً. لكي يسكن إلكترونان في مدار فرعي واحد، يجب أن يكون لهما لف مغزلي متعاكس: إلكترون يدور مع عقارب الساعة (Spin Down ↓ برتقالي)، والآخر يدور عكس عقارب الساعة (Spin Up ↑ سماوي). هذا التعاكس يولد مجالين مغناطيسيين متضادين يلغيان التنافر ويحققان أقصى استقرار للذرة!',
+                      'Electrons never rotate in the exact same direction in an orbit! Under the Pauli Exclusion Principle, two electrons sharing an orbital must have opposite spins (+½ Spin-Up ↑ cyan and -½ Spin-Down ↓ orange). This opposing rotation produces paired magnetic moments that minimize electromagnetic repulsion and establish atomic stability!'
+                    )}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px]">
+                    <div className="p-2 rounded-lg bg-slate-900 border border-sky-800/50 text-sky-300 flex items-center gap-2">
+                      <span className="font-bold text-sm">↑</span>
+                      <span>{t('غزل للأعلى (+½): حركة دورانية بعكس عقارب الساعة (سماوي)', 'Spin-Up (+½): Counter-clockwise motion (Cyan)')}</span>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900 border border-orange-800/50 text-orange-300 flex items-center gap-2">
+                      <span className="font-bold text-sm">↓</span>
+                      <span>{t('غزل للأسفل (-½): حركة دورانية مع عقارب الساعة (برتقالي)', 'Spin-Down (-½): Clockwise motion (Orange)')}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -905,6 +929,60 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                       {t(
                         'في معمل التجارب: أضف كبريتات النحاس الزرقاء CuSO₄ ثم أضف محلول الأمونيا NH₄OH. الملاحظة: يتحول اللون السماوي فورياً إلى أزرق نيلي داكن ملكي ساحر لتشكل معقد التناسق [Cu(NH₃)₄]²⁺!',
                         'In Experimental Lab: Add blue CuSO₄ solution then add ammonia NH₄OH. Observation: The sky-blue fluid dramatically transforms into an intense, deep royal navy coordination complex [Cu(NH₃)₄]²⁺!'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mission 8: Sodium Metal Detonation */}
+                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-8 h-8 rounded-xl bg-amber-950 border border-amber-500/50 flex items-center justify-center text-amber-300 font-black shrink-0 text-sm">
+                    8
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-bold text-sm text-amber-400">
+                      {t('💥 تفاعل وانفجار الصوديوم الفلزي مع الماء (2Na + 2H₂O)', 'Challenge: Violent Sodium Metal Water Detonation')}
+                    </h5>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {t(
+                        'في معمل التجارب: ضع 100 مل من الماء المقطر، ثم أضف قطعة من فلز الصوديوم النشط Na. الملاحظة: يحدث تفاعل طارد للحرارة بانفجار فوري، وتتطاير شرارات نارية صفراء باهرة مع تصاعد غاز الهيدروجين الحارق وارتفاع قلوية المحلول فورياً (pH > 13) لتكون هيدروكسيد الصوديوم!',
+                        'In Experimental Lab: Add 100 mL water, then drop active sodium metal Na. Observation: Violent exothermic detonation with bright yellow sparks, flammable H2 gas evolution, and immediate alkaline pH surge!'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mission 9: Magnesium Combustion Flare */}
+                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-8 h-8 rounded-xl bg-slate-800 border border-slate-600 flex items-center justify-center text-white font-black shrink-0 text-sm">
+                    9
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-bold text-sm text-slate-200">
+                      {t('🔥 احتراق شريط المغنيسيوم بالوهج الأبيض الساطع (2Mg + O₂)', 'Challenge: Magnesium Ribbon Fireworks Flare')}
+                    </h5>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {t(
+                        'في معمل التجارب: أضف شريط المغنيسيوم Mg ثم شغّل موقد بنزن أو اضغط زر «شرارة إشعال ⚡». الملاحظة: يشتعل المغنيسيوم بوهج أبيض ناصع باهر وفائق السطوع يحاكي احتراق الألعاب النارية، مخلفاً رماد أكسيد المغنيسيوم الأبيض MgO!',
+                        'In Experimental Lab: Add magnesium ribbon Mg, then ignite Bunsen burner or strike the Spark Igniter ⚡. Observation: Blinding white solar-intensity combustion flare emitting sparks and white MgO ash!'
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Mission 10: Hydrogen Pop Test */}
+                <div className={`p-4 rounded-2xl border flex items-start gap-3 ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className="w-8 h-8 rounded-xl bg-cyan-950 border border-cyan-500/50 flex items-center justify-center text-cyan-300 font-black shrink-0 text-sm">
+                    10
+                  </div>
+                  <div className="space-y-1">
+                    <h5 className="font-bold text-sm text-cyan-400">
+                      {t('⚡ اختبار فرقعة غاز الهيدروجين النقي (Hydrogen Pop Test)', 'Challenge: Hydrogen Gas Pop Detonation Test')}
+                    </h5>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      {t(
+                        'في معمل التجارب: بعد توليد غاز الهيدروجين H₂ من تفاعل الصوديوم مع الماء أو المغنيسيوم مع الحمض، انقر فوق أداة «شرارة إشعال ⚡». الملاحظة: يحدث انفجار صوتي سريع وفرقعة مبهجة ناتجة عن اتحاد الهيدروجين بالأكسجين مشكلاً بخار الماء!',
+                        'In Experimental Lab: After releasing flammable H2 gas, click "Spark Igniter ⚡". Observation: Fast acoustic Pop detonation occurs as H2 reacts explosively with O2 forming water vapor!'
                       )}
                     </p>
                   </div>
