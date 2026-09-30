@@ -655,6 +655,20 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                       <span>{t('غزل للأسفل (-½): حركة دورانية مع عقارب الساعة (برتقالي)', 'Spin-Down (-½): Clockwise motion (Orange)')}</span>
                     </div>
                   </div>
+
+                  {/* 3D Spatial Model & Quantum Cloud Explainer */}
+                  <div className="mt-3 p-3 rounded-xl bg-slate-950/80 border border-cyan-800/40 space-y-1.5 text-xs text-slate-300">
+                    <div className="flex items-center gap-1.5 text-cyan-400 font-bold">
+                      <span>🌐</span>
+                      <span>{t('النموذج الفضائي ثلاثي الأبعاد (3D Model):', '3D Spatial Model Capabilities:')}</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-slate-400">
+                      {t(
+                        'في الفضاء الحقيقي ثلاثي الأبعاد، لا تقع مدارات الإلكترونات في قرص مسطح! يمكنك التبديل بين نموذج بور الفضائي ذو المدارات المائلة ثلاثية الأبعاد، ونموذج رذرفورد المتقاطع، والسحابة الإلكترونية الكمية (|ψ|²) الاحتمالية، مع إمكانية تحريك وتدوير الذرة في كافة المحاور ودراسة أسهم الدوران المداري ثلاثية الأبعاد.',
+                        'In real 3D space, electron orbitals are not planar disks! You can toggle between the 3D Tilted Bohr Spatial model, Rutherford Crossed Orbits, and the Quantum Probability Cloud (|ψ|²), rotating the atom freely along all axes with full 3D orbital velocity vectors.'
+                      )}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

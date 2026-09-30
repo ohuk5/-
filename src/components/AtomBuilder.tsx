@@ -10,11 +10,13 @@ import {
   Info,
   ChevronDown,
   BookOpen,
-  Compass
+  Compass,
+  Box
 } from 'lucide-react';
 import { ALL_ELEMENTS, ELEMENT_MAP, ElementInfo, CATEGORY_COLORS } from '../data/elementsData';
 import { getElementDescription } from '../data/elementDescriptionsEn';
 import { PeriodicTableModal } from './PeriodicTableModal';
+import { AtomViewer3D } from './AtomViewer3D';
 import { useApp } from '../context/AppContext';
 
 interface NucleusNode {
@@ -40,6 +42,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [showSpinArrows, setShowSpinArrows] = useState<boolean>(true);
   const [orbitSpeed, setOrbitSpeed] = useState<number>(1.0); // 0 (pause), 0.3 (slow motion), 1.0 (normal), 1.6 (fast)
+  const [dimensionMode, setDimensionMode] = useState<'3d' | '2d' | 'split'>('3d');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const nucleusNodesRef = useRef<NucleusNode[]>([]);
@@ -99,32 +102,66 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
     const cx = canvas ? canvas.width / 2 : 210;
     const cy = canvas ? canvas.height / 2 : 210;
 
-    // Reconstruct nodes cleanly if large discrepancy
+    // Reconstruct nodes cleanly with dense, touching packing
     const newNodes: NucleusNode[] = [];
-    for (let i = 0; i < targetP; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * Math.min(28, 5 + targetTotal * 0.4);
-      newNodes.push({
-        x: cx + Math.cos(angle) * r,
-        y: cy + Math.sin(angle) * r,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        radius: targetTotal > 40 ? 5.5 : 7.5,
-        type: 'proton'
-      });
+    const nodeR = targetTotal > 40 ? 5.5 : (targetTotal > 15 ? 6.5 : 7.5);
+    const touchDist = nodeR * 1.94; // tightly touching with slight nuclear fusion overlap
+
+    // Interleave protons and neutrons: p, n, p, n...
+    const particleTypes: Array<'proton' | 'neutron'> = [];
+    let pRem = targetP;
+    let nRem = targetN;
+    while (pRem > 0 || nRem > 0) {
+      if (pRem > 0 && (nRem === 0 || pRem >= nRem)) {
+        particleTypes.push('proton');
+        pRem--;
+      } else if (nRem > 0) {
+        particleTypes.push('neutron');
+        nRem--;
+      }
     }
 
-    for (let i = 0; i < targetN; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * Math.min(28, 5 + targetTotal * 0.4);
+    if (targetTotal === 1) {
       newNodes.push({
-        x: cx + Math.cos(angle) * r,
-        y: cy + Math.sin(angle) * r,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.5,
-        radius: targetTotal > 40 ? 5.5 : 7.5,
-        type: 'neutron'
+        x: cx,
+        y: cy,
+        vx: 0,
+        vy: 0,
+        radius: nodeR,
+        type: particleTypes[0]
       });
+    } else if (targetTotal === 2) {
+      newNodes.push({
+        x: cx - touchDist * 0.5,
+        y: cy,
+        vx: 0,
+        vy: 0,
+        radius: nodeR,
+        type: particleTypes[0]
+      });
+      newNodes.push({
+        x: cx + touchDist * 0.5,
+        y: cy,
+        vx: 0,
+        vy: 0,
+        radius: nodeR,
+        type: particleTypes[1]
+      });
+    } else {
+      // Vogel's golden-angle dense circular packing for touching discs
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~137.5 degrees
+      for (let i = 0; i < targetTotal; i++) {
+        const r = i === 0 ? 0 : touchDist * 0.88 * Math.sqrt(i);
+        const theta = i * goldenAngle;
+        newNodes.push({
+          x: cx + Math.cos(theta) * r,
+          y: cy + Math.sin(theta) * r,
+          vx: 0,
+          vy: 0,
+          radius: nodeR,
+          type: particleTypes[i]
+        });
+      }
     }
 
     nucleusNodesRef.current = newNodes;
@@ -221,39 +258,39 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         const dx = cx - n1.x;
         const dy = cy - n1.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 1) {
-          n1.vx += dx * 0.04;
-          n1.vy += dy * 0.04;
+        if (dist > 0.5) {
+          n1.vx += dx * 0.085;
+          n1.vy += dy * 0.085;
         }
 
-        // Particle-to-particle repulsion
+        // Particle-to-particle contact repulsion
         for (let j = i + 1; j < nodes.length; j++) {
           const n2 = nodes[j];
           const ndx = n2.x - n1.x;
           const ndy = n2.y - n1.y;
           let ndist = Math.sqrt(ndx * ndx + ndy * ndy);
-          const minDist = n1.radius + n2.radius;
+          const minDist = (n1.radius + n2.radius) * 0.96; // tight touching contact
           if (ndist < minDist) {
             if (ndist === 0) ndist = 0.1;
             const overlap = minDist - ndist;
             const nx = ndx / ndist;
             const ny = ndy / ndist;
-            n1.vx -= nx * overlap * 0.4;
-            n1.vy -= ny * overlap * 0.4;
-            n2.vx += nx * overlap * 0.4;
-            n2.vy += ny * overlap * 0.4;
+            n1.vx -= nx * overlap * 0.32;
+            n1.vy -= ny * overlap * 0.32;
+            n2.vx += nx * overlap * 0.32;
+            n2.vy += ny * overlap * 0.32;
           }
         }
 
         // Jitter if radioactive
         if (!isStable && protons > 0) {
-          n1.vx += (Math.random() - 0.5) * 0.6;
-          n1.vy += (Math.random() - 0.5) * 0.6;
+          n1.vx += (Math.random() - 0.5) * 0.25;
+          n1.vy += (Math.random() - 0.5) * 0.25;
         }
 
         // Velocity damping
-        n1.vx *= 0.68;
-        n1.vy *= 0.68;
+        n1.vx *= 0.80;
+        n1.vy *= 0.80;
 
         n1.x += n1.vx;
         n1.y += n1.vy;
@@ -304,21 +341,26 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
       // Update Orbital Angles & Draw Orbiting Electrons (Pauli Principle: Alternating Directions & Spins)
       for (let i = 0; i < 7; i++) {
         if (shells[i] > 0) {
-          const speed = (0.038 / (i + 1)) * orbitSpeed;
-          shellAnglesRef.current[i] += speed * shellDirs[i];
+          const speed = (0.035 / (i + 1)) * orbitSpeed;
+          shellAnglesRef.current[i] += speed;
 
           const numE = shells[i];
           const r = shellRadii[i];
 
           for (let e = 0; e < numE; e++) {
             // Pauli Exclusion Principle: Paired electrons in an orbital have opposite spins and directions!
+            // Even electrons (0, 2, 4...) are Spin-Up (↑, Cyan), orbiting Counter-Clockwise (عكس عقارب الساعة)
+            // Odd electrons (1, 3, 5...) are Spin-Down (↓, Orange), orbiting Clockwise (مع عقارب الساعة)
             const isSpinUp = (e % 2 === 0);
-            const spinSign = isSpinUp ? 1 : -1;
-            const eDirection = spinSign * shellDirs[i];
 
-            // Counter-rotating or alternating directional phase
+            // Counter-rotating directional phase:
+            // In Canvas (+y down):
+            // - Decreasing theta = Counter-Clockwise (Spin Up ↑)
+            // - Increasing theta = Clockwise (Spin Down ↓)
             const baseTheta = e * ((Math.PI * 2) / numE);
-            const theta = baseTheta + (shellAnglesRef.current[i] * spinSign);
+            const theta = isSpinUp
+              ? baseTheta - shellAnglesRef.current[i]
+              : baseTheta + shellAnglesRef.current[i];
 
             const ex = cx + Math.cos(theta) * r;
             const ey = cy + Math.sin(theta) * r;
@@ -337,36 +379,72 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             // Directional Orbital Motion Arrow & Spin Badge (↑ / ↓)
             if (showSpinArrows) {
               const arrowArcSpan = 0.28; // radian arc ahead of electron
-              const startArc = theta + (eDirection > 0 ? 0.07 : -0.07);
-              const endArc = theta + (eDirection > 0 ? arrowArcSpan : -arrowArcSpan);
 
-              // Curved arc along orbit path
-              ctx.beginPath();
-              ctx.arc(cx, cy, r, startArc, endArc, eDirection < 0);
-              ctx.strokeStyle = isSpinUp ? 'rgba(56, 189, 248, 0.95)' : 'rgba(251, 146, 60, 0.95)';
-              ctx.lineWidth = 2.2;
-              ctx.stroke();
+              if (isSpinUp) {
+                // Moving counter-clockwise: ahead of electron is theta - arrowArcSpan
+                const startArc = theta - 0.07;
+                const endArc = theta - arrowArcSpan;
 
-              // Arrowhead pointing in orbital velocity direction
-              const tipX = cx + Math.cos(endArc) * r;
-              const tipY = cy + Math.sin(endArc) * r;
-              const tangentAngle = endArc + (eDirection > 0 ? Math.PI / 2 : -Math.PI / 2);
-              const headLen = 6.5;
+                // Curved arc along orbit path (counterclockwise = true)
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, startArc, endArc, true);
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.95)';
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
 
-              ctx.beginPath();
-              ctx.moveTo(tipX, tipY);
-              ctx.lineTo(
-                tipX - headLen * Math.cos(tangentAngle - Math.PI / 5.2),
-                tipY - headLen * Math.sin(tangentAngle - Math.PI / 5.2)
-              );
-              ctx.moveTo(tipX, tipY);
-              ctx.lineTo(
-                tipX - headLen * Math.cos(tangentAngle + Math.PI / 5.2),
-                tipY - headLen * Math.sin(tangentAngle + Math.PI / 5.2)
-              );
-              ctx.strokeStyle = isSpinUp ? '#38bdf8' : '#fb923c';
-              ctx.lineWidth = 2.2;
-              ctx.stroke();
+                // Arrowhead pointing in orbital velocity direction (tangent at endArc pointing CCW)
+                const tipX = cx + Math.cos(endArc) * r;
+                const tipY = cy + Math.sin(endArc) * r;
+                const tangentAngle = endArc - Math.PI / 2;
+                const headLen = 6.5;
+
+                ctx.beginPath();
+                ctx.moveTo(tipX, tipY);
+                ctx.lineTo(
+                  tipX - headLen * Math.cos(tangentAngle - Math.PI / 5.2),
+                  tipY - headLen * Math.sin(tangentAngle - Math.PI / 5.2)
+                );
+                ctx.moveTo(tipX, tipY);
+                ctx.lineTo(
+                  tipX - headLen * Math.cos(tangentAngle + Math.PI / 5.2),
+                  tipY - headLen * Math.sin(tangentAngle + Math.PI / 5.2)
+                );
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+              } else {
+                // Moving clockwise: ahead of electron is theta + arrowArcSpan
+                const startArc = theta + 0.07;
+                const endArc = theta + arrowArcSpan;
+
+                // Curved arc along orbit path (counterclockwise = false)
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, startArc, endArc, false);
+                ctx.strokeStyle = 'rgba(251, 146, 60, 0.95)';
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+
+                // Arrowhead pointing in orbital velocity direction (tangent at endArc pointing CW)
+                const tipX = cx + Math.cos(endArc) * r;
+                const tipY = cy + Math.sin(endArc) * r;
+                const tangentAngle = endArc + Math.PI / 2;
+                const headLen = 6.5;
+
+                ctx.beginPath();
+                ctx.moveTo(tipX, tipY);
+                ctx.lineTo(
+                  tipX - headLen * Math.cos(tangentAngle - Math.PI / 5.2),
+                  tipY - headLen * Math.sin(tangentAngle - Math.PI / 5.2)
+                );
+                ctx.moveTo(tipX, tipY);
+                ctx.lineTo(
+                  tipX - headLen * Math.cos(tangentAngle + Math.PI / 5.2),
+                  tipY - headLen * Math.sin(tangentAngle + Math.PI / 5.2)
+                );
+                ctx.strokeStyle = '#fb923c';
+                ctx.lineWidth = 2.2;
+                ctx.stroke();
+              }
 
               // Spin Orientation Badge (↑ Spin Up / ↓ Spin Down)
               const badgeRadius = r + 13.5;
@@ -413,24 +491,38 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
       // On-Canvas Spin Legend Box when arrows are shown
       if (showSpinArrows && electrons > 0) {
         ctx.save();
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-        ctx.lineWidth = 1;
+        const isArLang = lang === 'ar';
+        const boxW = isArLang ? 186 : 196;
+        const boxH = 46;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.roundRect(10, 10, 156, 44, 8);
+        ctx.roundRect(10, 10, boxW, boxH, 8);
         ctx.fill();
         ctx.stroke();
 
         ctx.font = 'bold 9.5px Cairo, sans-serif';
-        ctx.textAlign = 'right';
 
-        // Up Spin
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillText('↑ غزل للأعلى (+½) عكس عقارب', 158, 25);
+        if (isArLang) {
+          ctx.textAlign = 'right';
+          // Up Spin
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillText('↑ غزل للأعلى (+½) عكس عقارب الساعة', boxW + 2, 26);
 
-        // Down Spin
-        ctx.fillStyle = '#fb923c';
-        ctx.fillText('↓ غزل للأسفل (-½) مع عقارب', 158, 43);
+          // Down Spin
+          ctx.fillStyle = '#fb923c';
+          ctx.fillText('↓ غزل للأسفل (-½) مع عقارب الساعة', boxW + 2, 44);
+        } else {
+          ctx.textAlign = 'left';
+          // Up Spin
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillText('↑ Spin-Up (+½) Counter-Clockwise', 18, 26);
+
+          // Down Spin
+          ctx.fillStyle = '#fb923c';
+          ctx.fillText('↓ Spin-Down (-½) Clockwise', 18, 44);
+        }
         ctx.restore();
       }
 
@@ -739,24 +831,115 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
           <div className={`w-full border rounded-2xl p-4 shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
-            <div className="w-full flex items-center justify-between mb-2 px-1">
-              <span className="text-xs font-semibold text-slate-400">
-                {t('نموذج بور الكمي (مدارات K, L, M, N, O, P, Q)', 'Bohr Atomic Model (Shells K to Q)')}
-              </span>
-              <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/30 px-2 py-0.5 rounded">
+            {/* Top View Mode Switcher: 3D vs 2D vs Split */}
+            <div className="w-full flex items-center justify-between mb-3 px-1 gap-2 flex-wrap">
+              <div className="flex items-center gap-1 p-1 bg-slate-950/80 border border-slate-800 rounded-xl shadow-inner">
+                <button
+                  onClick={() => setDimensionMode('3d')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    dimensionMode === '3d'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={t('عرض النموذج الفضائي ثلاثي الأبعاد 3D', 'Switch to full 3D spatial model')}
+                >
+                  <Box className="w-3.5 h-3.5 text-cyan-300" />
+                  <span>{t('مجسم 3D', '3D Model')}</span>
+                </button>
+
+                <button
+                  onClick={() => setDimensionMode('2d')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    dimensionMode === '2d'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={t('مخطط مستويات الطاقة ومستويات بور المستوية 2D', '2D Bohr energy shell diagram')}
+                >
+                  <span>{t('مخطط بور 2D', '2D Bohr')}</span>
+                </button>
+
+                <button
+                  onClick={() => setDimensionMode('split')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    dimensionMode === 'split'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={t('عرض متزامن للنموذجين 2D و 3D معاً', 'Split view: both 2D and 3D models')}
+                >
+                  <span>{t('عرض متزامن (2D + 3D)', 'Split View')}</span>
+                </button>
+              </div>
+
+              <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/30 px-2.5 py-1 rounded-lg">
                 {electrons} {t('إلكترونات تدور', 'orbiting electrons')}
               </span>
             </div>
 
-            {/* Canvas Box */}
-            <div className="relative w-full aspect-square max-w-[340px] sm:max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
-              <canvas
-                ref={canvasRef}
-                width={420}
-                height={420}
-                className="w-full h-full"
-              />
-            </div>
+            {/* Viewports Rendering Area */}
+            {dimensionMode === '3d' && (
+              <div className="w-full flex flex-col items-center">
+                <AtomViewer3D
+                  protons={protons}
+                  neutrons={neutrons}
+                  electrons={electrons}
+                  elementSymbol={currentElement.symbol}
+                  elementName={t(currentElement.name, currentElement.englishName)}
+                  isStable={isStable}
+                  showSpinArrows={showSpinArrows}
+                  orbitSpeed={orbitSpeed}
+                />
+              </div>
+            )}
+
+            {dimensionMode === '2d' && (
+              <div className="relative w-full aspect-square max-w-[340px] sm:max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+                <canvas
+                  ref={canvasRef}
+                  width={420}
+                  height={420}
+                  className="w-full h-full"
+                />
+              </div>
+            )}
+
+            {dimensionMode === 'split' && (
+              <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-4 items-center justify-center">
+                {/* 3D Model Card */}
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-cyan-400 flex items-center gap-1 self-start px-1">
+                    <Box className="w-3 h-3" />
+                    <span>{t('النموذج الفضائي ثلاثي الأبعاد (اسحب للف والدوران)', '3D Spatial Model (Drag to rotate)')}</span>
+                  </span>
+                  <AtomViewer3D
+                    protons={protons}
+                    neutrons={neutrons}
+                    electrons={electrons}
+                    elementSymbol={currentElement.symbol}
+                    elementName={t(currentElement.name, currentElement.englishName)}
+                    isStable={isStable}
+                    showSpinArrows={showSpinArrows}
+                    orbitSpeed={orbitSpeed}
+                  />
+                </div>
+
+                {/* 2D Bohr Diagram Card */}
+                <div className="flex flex-col items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-300 self-start px-1">
+                    {t('مخطط مستويات الطاقة لبور 2D (K, L, M, N...)', '2D Bohr Energy Shells Diagram')}
+                  </span>
+                  <div className="relative w-full aspect-square max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+                    <canvas
+                      ref={canvasRef}
+                      width={420}
+                      height={420}
+                      className="w-full h-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="w-full flex items-center justify-between px-1 mt-3 text-[11px] text-slate-400">
               <span className="flex items-center gap-1.5">
