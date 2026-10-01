@@ -11,7 +11,8 @@ import {
   ChevronDown,
   BookOpen,
   Compass,
-  Box
+  Box,
+  Sparkles
 } from 'lucide-react';
 import { ALL_ELEMENTS, ELEMENT_MAP, ElementInfo, CATEGORY_COLORS } from '../data/elementsData';
 import { getElementDescription } from '../data/elementDescriptionsEn';
@@ -90,6 +91,12 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
       return Math.abs(neutrons - idealNeutrons) <= 2;
     }
   }, [protons, neutrons, currentElement]);
+
+  // Nuclear Magic Numbers evaluation (2, 8, 20, 28, 50, 82, 126)
+  const MAGIC_NUMBERS = [2, 8, 20, 28, 50, 82, 126];
+  const isProtonMagic = MAGIC_NUMBERS.includes(protons);
+  const isNeutronMagic = MAGIC_NUMBERS.includes(neutrons);
+  const isDoublyMagic = isProtonMagic && isNeutronMagic;
 
   // Sync nucleus nodes when particle count changes
   useEffect(() => {
@@ -1147,6 +1154,33 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                 {protons === 0 ? '--' : isStable ? t('مستقر كيميائياً', 'Stable') : t('تخضع لاضمحلال', 'Decaying')}
               </span>
             </div>
+
+            {/* Nuclear Magic Numbers Interactive Indicator */}
+            {(isProtonMagic || isNeutronMagic) && protons > 0 && (
+              <div className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                isDoublyMagic
+                  ? 'bg-gradient-to-r from-amber-950/60 via-purple-950/40 to-slate-900 border-amber-500/60 text-amber-300 shadow-md shadow-amber-500/10'
+                  : 'bg-purple-950/30 border-purple-800/40 text-purple-300'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Sparkles className={`w-4 h-4 shrink-0 ${isDoublyMagic ? 'text-amber-400 animate-pulse' : 'text-purple-400'}`} />
+                  <div>
+                    <span className="font-extrabold block text-[11px]">
+                      {isDoublyMagic
+                        ? t('🌟 نواة سحرية الازدواج (Doubly Magic)!', '🌟 Doubly Magic Nucleus!')
+                        : t('✨ عدد نووي سحري (Magic Number)', '✨ Nuclear Magic Number')}
+                    </span>
+                    <span className="text-[10px] text-slate-300 leading-tight block">
+                      {isDoublyMagic
+                        ? t(`بروتونات (${protons}) + نيوترونات (${neutrons}) أغلفة نووية كمية مغلقة فائقة الاستقرار!`, `Z=${protons}, N=${neutrons} closed quantum nuclear shells with maximum stability!`)
+                        : isProtonMagic
+                        ? t(`غلاف بروتوني مغلق بالكامل (Z = ${protons})`, `Closed quantum proton shell (Z = ${protons})`)
+                        : t(`غلاف نيوتروني مغلق بالكامل (N = ${neutrons})`, `Closed quantum neutron shell (N = ${neutrons})`)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Electron Configuration */}
             <div className={`p-3 rounded-xl border space-y-1.5 ${

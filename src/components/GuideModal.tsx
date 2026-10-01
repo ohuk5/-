@@ -670,6 +670,81 @@ export const GuideModal: React.FC<GuideModalProps> = ({
                     </p>
                   </div>
                 </div>
+
+                {/* Nuclear Magic Numbers Scientific Guide (مفهوم الأرقام السحرية في الفيزياء النووية) */}
+                <div className={`p-4 sm:p-5 rounded-2xl border space-y-3.5 shadow-lg ${
+                  isDark
+                    ? 'bg-gradient-to-br from-purple-950/40 via-slate-900 to-amber-950/20 border-purple-500/40'
+                    : 'bg-gradient-to-br from-purple-50/80 via-white to-amber-50/50 border-purple-200'
+                }`}>
+                  <div className="flex items-center justify-between pb-2 border-b border-purple-500/30">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-amber-400" />
+                      <h4 className="text-sm sm:text-base font-extrabold text-purple-300">
+                        {t('الأرقام السحرية في الفيزياء النووية (Nuclear Magic Numbers)', 'Nuclear Magic Numbers in Quantum Physics')}
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-600 text-purple-300">
+                      2, 8, 20, 28, 50, 82, 126
+                    </span>
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    {t(
+                      'مثلما تمتلئ مدارات الإلكترونات الخارجية لتعطي الغازات الخاملة فائقة الاستقرار الكيميائي (كالهيليوم والنيون والآرجون)، تمتلك النواة أيضاً "أغلفة كمية نووية" خاصة بالبروتونات والنيوترونات تُعرف بـ (نموذج الغلاف النووي - Nuclear Shell Model). عندما يكتمل غلاف نووي بعدد محدد من النيوكليونات، تصبح النواة فائقة الاستقرار والتماسك وتسمى هذه الأعداد: الأرقام السحرية (Magic Numbers).',
+                      'Just as complete electron shells give noble gases extreme chemical stability (like He, Ne, Ar), atomic nuclei possess quantum nuclear energy shells for protons and neutrons (Nuclear Shell Model). When a nuclear shell is completely filled, the nucleus attains extraordinary binding energy and stability. These magical threshold counts are known as Nuclear Magic Numbers.'
+                    )}
+                  </p>
+
+                  {/* Magic Numbers Badge Row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-center text-xs font-mono">
+                    {[
+                      { num: 2, label: 'Helium Shell', ar: 'غلاف الهيليوم (²He)' },
+                      { num: 8, label: 'Oxygen Shell', ar: 'غلاف الأكسجين (¹⁶O)' },
+                      { num: 20, label: 'Calcium Shell', ar: 'غلاف الكالسيوم (⁴⁰Ca)' },
+                      { num: 28, label: 'Nickel Shell', ar: 'غلاف النيكل (⁵⁶Ni)' },
+                      { num: 50, label: 'Tin Shell', ar: 'غلاف القصدير (¹²⁰Sn)' },
+                      { num: 82, label: 'Lead Shell', ar: 'غلاف الرصاص (²⁰⁸Pb)' },
+                      { num: 126, label: 'Neutron Shell', ar: 'غلاف النيوترونات (126n)' }
+                    ].map(m => (
+                      <div key={m.num} className="p-2 rounded-xl bg-slate-950/70 border border-purple-800/50 flex flex-col items-center justify-center">
+                        <span className="text-lg font-black text-amber-400 font-mono">{m.num}</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">{t(m.ar, m.label)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Deep Scientific Concepts Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
+                    {/* Doubly Magic Nuclei */}
+                    <div className="p-3.5 rounded-xl bg-slate-950/80 border border-amber-500/40 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                        <span>🌟</span>
+                        <span>{t('النوى سحرية الازدواج (Doubly Magic Nuclei):', 'Doubly Magic Nuclei:')}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        {t(
+                          'إذا احتوت النواة على رقم سحري من البروتونات ورقم سحري آخر من النيوترونات معاً، تسمى "سحرية الازدواج" وتعد أصلب النوى في الكون على الإطلاق! أمثلتها: الهيليوم-4 (2p + 2n)، والأكسجين-16 (8p + 8n)، والرصاص-208 (82p + 126n) وهو أثقل عنصر مستقر في الطبيعة ومحطة نهاية سلاسل الاضمحلال الإشعاعي لليورانيوم.',
+                          'When a nucleus possesses BOTH a magic number of protons and a magic number of neutrons, it is "doubly magic" — the most tightly bound and stable matter in the cosmos! Prime examples: Helium-4 (2p, 2n), Oxygen-16 (8p, 8n), and Lead-208 (82p, 126n), the heaviest stable nucleus in the universe and the ultimate terminus of radioactive decay chains.'
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Nobel Prize & Island of Stability */}
+                    <div className="p-3.5 rounded-xl bg-slate-950/80 border border-purple-500/40 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-purple-300 font-bold">
+                        <span>🏝️</span>
+                        <span>{t('نوبل فيزياء 1963 وجزيرة الاستقرار:', 'Nobel Prize & The Island of Stability:')}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        {t(
+                          'اكتشفت العالمة ماريا غوبرت-ماير وهانس ينسن أن هذه الأرقام تنشأ بسبب اقتران الغزل والمدار النووي (Spin-Orbit Coupling) ونالا نوبل 1963. ويتوقع الفيزيائيون وجود "جزيرة استقرار" لعناصر فائقة الثقل اصطناعية بعمر نصف طويل إذا امتلكت أرقاماً سحرية تالية مثل Z=114 أو Z=120 و N=184!',
+                          'Physicists Maria Goeppert Mayer and J. Hans D. Jensen discovered that spin-orbit coupling explains these exact quantum gaps (1963 Nobel Prize in Physics). This model predicts a theoretical "Island of Stability" for superheavy synthetic elements with prolonged half-lives around Z=114 or 120 and N=184.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

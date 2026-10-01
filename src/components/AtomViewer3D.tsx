@@ -250,20 +250,22 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
 
       clusterMaxRadius = positions.length > 0 ? Math.max(...positions.map(p => p.length())) + sphereR : 2.0;
 
-      // Add Glowing Nuclear Field Halo tightly around the dense cluster
-      const haloGeo = new THREE.SphereGeometry(clusterMaxRadius * 1.18, 24, 24);
+      // Add Glowing Nuclear Field Halo tightly around the dense cluster (smooth glowing shell, non-wireframe)
+      const haloGeo = new THREE.SphereGeometry(clusterMaxRadius * 1.15, 32, 32);
       const haloMat = new THREE.MeshBasicMaterial({
-        color: isStable ? 0x06b6d4 : 0xf43f5e,
+        color: isStable ? 0x38bdf8 : 0xf43f5e,
         transparent: true,
-        opacity: 0.12,
-        wireframe: true
+        opacity: 0.10,
+        blending: THREE.AdditiveBlending,
+        wireframe: false,
+        side: THREE.BackSide
       });
       const haloMesh = new THREE.Mesh(haloGeo, haloMat);
       nucleusGroup.add(haloMesh);
     }
 
     // --- B. BUILD 3D ELECTRON SHELLS & ORBITALS ---
-    const baseRadius = Math.max(9.0, clusterMaxRadius + 4.0);
+    const baseRadius = Math.max(9.0, clusterMaxRadius + 4.2);
     const radiusStep = 5.2;
 
     // Electron Geometries & Materials
@@ -281,57 +283,45 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
       roughness: 0.2
     });
 
-    if (viewType === 'bohr_spatial' || viewType === 'rutherford') {
+    if (viewType === 'bohr_spatial') {
+      // Bohr 3D Spatial: Each principal quantum shell has its own tilted spatial plane.
+      // ALL electrons belonging to that shell travel STRICTLY on that shell's ring.
       shells.forEach((count, shellIdx) => {
         if (count === 0) return;
 
         const shellRadius = baseRadius + shellIdx * radiusStep;
+        
+        // Coordinated 3D tilt angle per shell giving authentic spatial depth
+        const tiltX = (shellIdx * 0.26) - 0.2;
+        const tiltY = (shellIdx * 0.42);
+        const tiltZ = (shellIdx * 0.18) - 0.1;
 
-        // Distinct 3D spatial inclination per shell or orbital plane
+        // 1. Build and add the visible 3D Orbit Ring for this shell
+        if (showRings) {
+          const curve = new THREE.EllipseCurve(
+            0, 0,
+            shellRadius, shellRadius,
+            0, 2 * Math.PI,
+            false,
+            0
+          );
+          const points = curve.getPoints(128);
+          const ringGeo = new THREE.BufferGeometry().setFromPoints(
+            points.map(p => new THREE.Vector3(p.x, 0, p.y))
+          );
+          const ringMat = new THREE.LineBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.45
+          });
+          const ringLine = new THREE.LineLoop(ringGeo, ringMat);
+          ringLine.rotation.set(tiltX, tiltY, tiltZ);
+          atomGroup.add(ringLine);
+        }
+
+        // 2. Distribute all electrons in this shell strictly along this ring
         for (let e = 0; e < count; e++) {
           const isSpinUp = e % 2 === 0;
-          const pairIndex = Math.floor(e / 2);
-          
-          // Spatial orientation angles: Rutherford/Bohr atoms have crossed spatial planes
-          let incX = 0;
-          let incY = 0;
-          let incZ = 0;
-
-          if (viewType === 'rutherford') {
-            // Crossed distinct 3D orbital rings like atomic logo
-            const planeAngle = (pairIndex * (Math.PI / 3)) + (shellIdx * 0.4);
-            incX = Math.cos(planeAngle) * 0.8;
-            incY = Math.sin(planeAngle) * 0.8;
-            incZ = 0.3 * (shellIdx + 1);
-          } else {
-            // Bohr Spatial: realistic quantum tilted orbital planes
-            incX = (shellIdx * 0.25) + (pairIndex * 0.4);
-            incY = (pairIndex * 0.5);
-            incZ = (shellIdx * 0.15);
-          }
-
-          // Build Orbit Ring if enabled (draw once per distinct orbital plane)
-          if (showRings && (e === 0 || viewType === 'rutherford')) {
-            const curve = new THREE.EllipseCurve(
-              0, 0,
-              shellRadius, shellRadius,
-              0, 2 * Math.PI,
-              false,
-              0
-            );
-            const points = curve.getPoints(64);
-            const ringGeo = new THREE.BufferGeometry().setFromPoints(
-              points.map(p => new THREE.Vector3(p.x, 0, p.y))
-            );
-            const ringMat = new THREE.LineBasicMaterial({
-              color: isSpinUp ? 0x0891b2 : 0xc2410c,
-              transparent: true,
-              opacity: 0.35
-            });
-            const ringLine = new THREE.LineLoop(ringGeo, ringMat);
-            ringLine.rotation.set(incX, incY, incZ);
-            atomGroup.add(ringLine);
-          }
 
           // Single Electron 3D Group
           const eGroup = new THREE.Group();
@@ -376,9 +366,102 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
             orbitRadius: shellRadius,
             speed: baseSpeed,
             angle: initialAngle,
-            inclinationX: incX,
-            inclinationY: incY,
-            inclinationZ: incZ,
+            inclinationX: tiltX,
+            inclinationY: tiltY,
+            inclinationZ: tiltZ,
+            isSpinUp,
+            arrowGroup
+          });
+        }
+      });
+    } else if (viewType === 'rutherford') {
+      // Classic Rutherford crossed orbital planes (iconic 3 crossed 3D orbits)
+      const rutherfordPlanes = [
+        { incX: 0.85, incY: 0.1, incZ: 0.35, color: 0x38bdf8 },
+        { incX: -0.75, incY: 0.5, incZ: -0.4, color: 0x818cf8 },
+        { incX: 0.15, incY: 0.95, incZ: 0.8, color: 0x34d399 }
+      ];
+
+      shells.forEach((count, shellIdx) => {
+        if (count === 0) return;
+        const shellRadius = baseRadius + shellIdx * radiusStep;
+
+        // Draw rings for each crossed plane used in this shell
+        const activePlanesCount = Math.min(3, Math.max(1, Math.ceil(count / 2)));
+        for (let pIdx = 0; pIdx < activePlanesCount; pIdx++) {
+          if (showRings) {
+            const curve = new THREE.EllipseCurve(
+              0, 0,
+              shellRadius, shellRadius,
+              0, 2 * Math.PI,
+              false,
+              0
+            );
+            const points = curve.getPoints(128);
+            const ringGeo = new THREE.BufferGeometry().setFromPoints(
+              points.map(p => new THREE.Vector3(p.x, 0, p.y))
+            );
+            const ringMat = new THREE.LineBasicMaterial({
+              color: rutherfordPlanes[pIdx].color,
+              transparent: true,
+              opacity: 0.45
+            });
+            const ringLine = new THREE.LineLoop(ringGeo, ringMat);
+            ringLine.rotation.set(
+              rutherfordPlanes[pIdx].incX,
+              rutherfordPlanes[pIdx].incY,
+              rutherfordPlanes[pIdx].incZ
+            );
+            atomGroup.add(ringLine);
+          }
+        }
+
+        // Distribute electrons strictly onto these crossed planes
+        for (let e = 0; e < count; e++) {
+          const isSpinUp = e % 2 === 0;
+          const planeIdx = Math.floor(e / 2) % activePlanesCount;
+          const plane = rutherfordPlanes[planeIdx];
+
+          const eGroup = new THREE.Group();
+          const eMesh = new THREE.Mesh(electronGeo, isSpinUp ? spinUpMat : spinDownMat);
+          eGroup.add(eMesh);
+
+          let arrowGroup: THREE.Group | undefined;
+          if (showSpinArrows) {
+            arrowGroup = new THREE.Group();
+            const coneGeo = new THREE.ConeGeometry(0.5, 1.4, 8);
+            coneGeo.rotateX(Math.PI / 2);
+            const arrowMat = new THREE.MeshBasicMaterial({
+              color: isSpinUp ? 0x67e8f9 : 0xfdba74
+            });
+            const coneMesh = new THREE.Mesh(coneGeo, arrowMat);
+            coneMesh.position.set(0, 0, 1.2);
+            arrowGroup.add(coneMesh);
+
+            const shaftGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 6);
+            shaftGeo.rotateX(Math.PI / 2);
+            const shaftMesh = new THREE.Mesh(shaftGeo, arrowMat);
+            shaftMesh.position.set(0, 0, 0);
+            arrowGroup.add(shaftMesh);
+
+            eGroup.add(arrowGroup);
+          }
+
+          atomGroup.add(eGroup);
+
+          const direction = isSpinUp ? -1 : 1;
+          const baseSpeed = (0.024 / (shellIdx + 1)) * direction;
+          const initialAngle = (e / count) * Math.PI * 2;
+
+          electronMeshes.push({
+            mesh: eGroup,
+            shellIndex: shellIdx,
+            orbitRadius: shellRadius,
+            speed: baseSpeed,
+            angle: initialAngle,
+            inclinationX: plane.incX,
+            inclinationY: plane.incY,
+            inclinationZ: plane.incZ,
             isSpinUp,
             arrowGroup
           });

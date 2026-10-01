@@ -270,22 +270,27 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
 
       // Draw Ejected Particles (Alpha / Beta / Gamma)
       const particles = ejectedParticlesRef.current;
-      for (let i = particles.length - 1; i >= 0; i--) {
+      for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.018;
-
-        if (p.life <= 0) {
-          particles.splice(i, 1);
-          continue;
+        
+        // Decelerate and hold particle inside canvas bounds
+        const distFromCenter = Math.sqrt((p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy));
+        if (distFromCenter < 100) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.94;
+          p.vy *= 0.94;
         }
+
+        // Clamp securely inside canvas
+        p.x = Math.max(35, Math.min(w - 35, p.x));
+        p.y = Math.max(28, Math.min(h - 22, p.y));
 
         // Trail path
         ctx.beginPath();
         ctx.strokeStyle = p.color;
-        ctx.lineWidth = p.size * 0.7;
-        ctx.setLineDash([2, 4]);
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([3, 3]);
         ctx.moveTo(cx, cy);
         ctx.lineTo(p.x, p.y);
         ctx.stroke();
@@ -296,15 +301,51 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 10;
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Label
-        ctx.fillStyle = '#ffffff';
+        // Label Tag Box
         ctx.font = 'bold 9px Cairo, sans-serif';
         ctx.textAlign = 'center';
+        const labelW = ctx.measureText(p.label).width + 8;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.fillRect(p.x - labelW / 2, p.y - 18, labelW, 13);
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(p.x - labelW / 2, p.y - 18, labelW, 13);
+
+        ctx.fillStyle = '#ffffff';
         ctx.fillText(p.label, p.x, p.y - 8);
+      }
+
+      // Top Status Banner on Canvas
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
+      ctx.fillRect(6, 6, w - 12, 20);
+      ctx.strokeStyle = singleStatus === 'decayed' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(6, 6, w - 12, 20);
+
+      ctx.font = 'bold 9.5px Cairo, sans-serif';
+      ctx.textAlign = 'center';
+      if (singleStatus === 'idle' || singleStatus === 'vibrating') {
+        ctx.fillStyle = '#f87171';
+        ctx.fillText(
+          lang === 'ar'
+            ? `النواة الأم الأصلية غير المستقرة: ${activeIsotope.name} (${activeIsotope.symbol})`
+            : `Unstable Parent Nucleus: ${activeIsotope.nameEn} (${activeIsotope.symbol})`,
+          w / 2,
+          20
+        );
+      } else {
+        ctx.fillStyle = '#34d399';
+        ctx.fillText(
+          lang === 'ar'
+            ? `تم التفكك ⬅️ تكونت: ${activeIsotope.daughterName} (${activeIsotope.daughterSymbol}) + انبعاث ${activeIsotope.decayModeAr}`
+            : `Decayed ⬅️ Formed: ${activeIsotope.daughterNameEn} (${activeIsotope.daughterSymbol}) + ${activeIsotope.decayModeEn}`,
+          w / 2,
+          20
+        );
       }
 
       singleAnimFrameRef.current = requestAnimationFrame(render);
@@ -316,7 +357,7 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
       isRunning = false;
       if (singleAnimFrameRef.current) cancelAnimationFrame(singleAnimFrameRef.current);
     };
-  }, [singleStatus, activeIsotope]);
+  }, [singleStatus, activeIsotope, lang]);
 
   const spawnEjectedParticles = (cx: number, cy: number) => {
     const list: EjectedParticle[] = [];
@@ -591,6 +632,67 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
                 {t('إعادة النواة الأصلية', 'Restore Nucleus')}
               </button>
             </div>
+
+            {/* Decayed Materials Breakdown Panel (تقرير بيان المواد التي تفككت والجسيمات الناتجة) */}
+            <div className={`p-3.5 rounded-xl border space-y-2.5 text-xs ${
+              isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
+                <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>{t('بيان المواد التي تفككت والتحول النووي:', 'Decayed Materials & Transmutation Breakdown:')}</span>
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                  singleStatus === 'decayed'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                }`}>
+                  {singleStatus === 'decayed' ? t('تم التفكك بنجاح', 'Decay Complete') : t('جاهزة للتفكك', 'Ready for Decay')}
+                </span>
+              </div>
+
+              {/* Transformation Comparison Grid */}
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                {/* Parent Material */}
+                <div className="p-2.5 rounded-lg bg-red-950/30 border border-red-800/40 space-y-1">
+                  <span className="text-[10px] font-bold text-red-400 block">{t('🔴 المادة الأصلية (Parent):', '🔴 Parent Isotope:')}</span>
+                  <div className="font-bold text-white text-xs">{lang === 'ar' ? activeIsotope.name : activeIsotope.nameEn}</div>
+                  <div className="font-mono text-cyan-300 font-bold">{activeIsotope.symbol}</div>
+                  <div className="text-[10px] text-slate-400">
+                    p⁺ = {activeIsotope.atomicNumber} | n⁰ = {activeIsotope.massNumber - activeIsotope.atomicNumber}
+                  </div>
+                  <div className="text-[9px] text-red-300 font-semibold">{t('نواة مشعة غير مستقرة', 'Radioactive')}</div>
+                </div>
+
+                {/* Daughter Material */}
+                <div className="p-2.5 rounded-lg bg-emerald-950/30 border border-emerald-800/40 space-y-1">
+                  <span className="text-[10px] font-bold text-emerald-400 block">{t('🟢 المادة الناتجة (Daughter):', '🟢 Daughter Isotope:')}</span>
+                  <div className="font-bold text-white text-xs">{lang === 'ar' ? activeIsotope.daughterName : activeIsotope.daughterNameEn}</div>
+                  <div className="font-mono text-emerald-300 font-bold">{activeIsotope.daughterSymbol}</div>
+                  <div className="text-[10px] text-slate-400">
+                    p⁺ = {activeIsotope.daughterAtomic} | n⁰ = {activeIsotope.daughterMass - activeIsotope.daughterAtomic}
+                  </div>
+                  <div className="text-[9px] text-emerald-300 font-semibold">{t('نواة وليدة مستقرة تماماً', 'Stable Daughter')}</div>
+                </div>
+              </div>
+
+              {/* Emitted Radiation Particles */}
+              <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 space-y-1">
+                <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-amber-400" />
+                  <span>{t('⚡ الإشعاع والجسيمات المنبعثة المقذوفة:', '⚡ Ejected Radiation & Quanta:')}</span>
+                </span>
+                <p className="text-[11px] text-slate-300 leading-tight">
+                  {lang === 'ar' ? activeIsotope.emittedParticleDesc : activeIsotope.emittedParticleDescEn}
+                </p>
+              </div>
+
+              {/* Nuclear Equation */}
+              <div className="p-2 rounded-lg bg-slate-900/90 border border-cyan-800/50 flex items-center justify-between font-mono text-xs">
+                <span className="text-slate-400 text-[10px]">{t('المعادلة النووية:', 'Nuclear Eq:')}</span>
+                <span className="text-cyan-300 font-extrabold tracking-wide">{activeIsotope.equation}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -610,6 +712,36 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
               </span>
             </div>
 
+            {/* Live Dual-Material Composition Bar (شريط نسبة تحول المواد الحية) */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="flex items-center justify-between text-xs font-bold">
+                <span className="text-red-400 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm shadow-red-500" />
+                  <span>{lang === 'ar' ? activeIsotope.name : activeIsotope.nameEn} ({activeIsotope.symbol}): {unstableCount}%</span>
+                </span>
+                <span className="text-emerald-400 flex items-center gap-1.5">
+                  <span>{lang === 'ar' ? activeIsotope.daughterName : activeIsotope.daughterNameEn} ({activeIsotope.daughterSymbol}): {stableCount}%</span>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500" />
+                </span>
+              </div>
+              <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden flex shadow-inner">
+                <div
+                  className="h-full bg-red-500 transition-all duration-500"
+                  style={{ width: `${unstableCount}%` }}
+                  title={`${unstableCount}% ${activeIsotope.name}`}
+                />
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${stableCount}%` }}
+                  title={`${stableCount}% ${activeIsotope.daughterName}`}
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                <span>{t('المادة المشعة الأصلية المتبقية', 'Remaining Parent Material')}</span>
+                <span>{t('المادة المستقرة الناتجة عن التفكك', 'Transmuted Daughter Material')}</span>
+              </div>
+            </div>
+
             {/* 10x10 Grid of 100 atoms */}
             <div className="grid grid-cols-10 gap-1.5 sm:gap-2 p-3 sm:p-4 bg-slate-950 rounded-xl border border-slate-800">
               {gridCells.map((cell) => {
@@ -619,8 +751,8 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
                     key={cell.id}
                     title={
                       isUnstable
-                        ? `${activeIsotope.name} unstable`
-                        : `${activeIsotope.daughterName} stable (Cycle ${cell.decayCycle})`
+                        ? `${activeIsotope.name} (${activeIsotope.symbol}) ${t('لم تتفكك بعد', 'unstable')}`
+                        : `${activeIsotope.daughterName} (${activeIsotope.daughterSymbol}) ${t('تفككت واستقرت في الدورة', 'stable formed in cycle')} ${cell.decayCycle}`
                     }
                     className={`aspect-square rounded-full transition-all duration-700 flex items-center justify-center ${
                       isUnstable
@@ -632,31 +764,49 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
               })}
             </div>
 
-            {/* Live Percentages */}
+            {/* Live Percentages with Explicit Element Names */}
             <div className="grid grid-cols-2 gap-3 text-center">
               <div className="bg-red-950/20 border border-red-900/40 p-3 rounded-xl">
-                <span className="text-xs text-slate-400 block font-semibold mb-1">
-                  {t('النسبة المشعة المتبقية', 'Remaining Radioactive')}
+                <span className="text-xs text-red-300 block font-bold mb-1">
+                  🔴 {lang === 'ar' ? activeIsotope.name : activeIsotope.nameEn} ({activeIsotope.symbol})
                 </span>
                 <span className="font-mono text-2xl font-black text-red-400">
                   {unstableCount}%
                 </span>
-                <span className="text-[10px] text-slate-500 block mt-0.5 font-mono">
-                  {unstableCount} / 100 {t('نواة', 'nuclei')}
+                <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+                  {unstableCount} / 100 {t('ذرة لم تتفكك بعد', 'nuclei remaining')}
                 </span>
               </div>
 
               <div className="bg-emerald-950/20 border border-emerald-900/40 p-3 rounded-xl">
-                <span className="text-xs text-slate-400 block font-semibold mb-1">
-                  {t('النسبة المستقرة المتكونة', 'Stable Daughters Formed')}
+                <span className="text-xs text-emerald-300 block font-bold mb-1">
+                  🟢 {lang === 'ar' ? activeIsotope.daughterName : activeIsotope.daughterNameEn} ({activeIsotope.daughterSymbol})
                 </span>
                 <span className="font-mono text-2xl font-black text-emerald-400">
                   {stableCount}%
                 </span>
-                <span className="text-[10px] text-slate-500 block mt-0.5 font-mono">
-                  {stableCount} / 100 {t('نواة', 'nuclei')}
+                <span className="text-[10px] text-slate-400 block mt-0.5 font-mono">
+                  {stableCount} / 100 {t('ذرة تفككت وتحولت كلياً', 'daughters formed')}
                 </span>
               </div>
+            </div>
+
+            {/* Accumulated Radiation Quanta Counter */}
+            <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-800/40 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-bold text-amber-300 block">
+                    {t('إجمالي الجسيمات الإشعاعية المنبعثة في الوسط:', 'Total Ejected Radioactive Particles:')}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {lang === 'ar' ? activeIsotope.emittedParticleDesc : activeIsotope.emittedParticleDescEn}
+                  </span>
+                </div>
+              </div>
+              <span className="text-xl font-mono font-black text-amber-400 shrink-0">
+                +{stableCount}
+              </span>
             </div>
 
             {/* Explanation on Stochastic Behavior */}
