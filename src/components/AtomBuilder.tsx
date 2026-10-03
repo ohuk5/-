@@ -43,7 +43,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [showSpinArrows, setShowSpinArrows] = useState<boolean>(true);
   const [orbitSpeed, setOrbitSpeed] = useState<number>(1.0); // 0 (pause), 0.3 (slow motion), 1.0 (normal), 1.6 (fast)
-  const [dimensionMode, setDimensionMode] = useState<'3d' | '2d' | 'split'>('3d');
+  const [dimensionMode, setDimensionMode] = useState<'3d' | '2d'>('3d');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const nucleusNodesRef = useRef<NucleusNode[]>([]);
@@ -172,10 +172,11 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
     }
 
     nucleusNodesRef.current = newNodes;
-  }, [protons, neutrons]);
+  }, [protons, neutrons, dimensionMode]);
 
   // Continuous animation loop for Bohr orbits & Nucleus physics
   useEffect(() => {
+    if (dimensionMode === '3d') return; // Only run 2D canvas animation when 2D or split is active!
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -544,7 +545,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         cancelAnimationFrame(animationFrameIdRef.current);
       }
     };
-  }, [protons, neutrons, electrons, isStable, currentElement, showSpinArrows, orbitSpeed]);
+  }, [protons, neutrons, electrons, isStable, currentElement, showSpinArrows, orbitSpeed, dimensionMode]);
 
   const loadElement = (el: ElementInfo) => {
     setProtons(el.atomicNumber);
@@ -865,18 +866,6 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                 >
                   <span>{t('مخطط بور 2D', '2D Bohr')}</span>
                 </button>
-
-                <button
-                  onClick={() => setDimensionMode('split')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    dimensionMode === 'split'
-                      ? 'bg-cyan-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title={t('عرض متزامن للنموذجين 2D و 3D معاً', 'Split view: both 2D and 3D models')}
-                >
-                  <span>{t('عرض متزامن (2D + 3D)', 'Split View')}</span>
-                </button>
               </div>
 
               <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/50 border border-cyan-800/30 px-2.5 py-1 rounded-lg">
@@ -884,42 +873,12 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
               </span>
             </div>
 
-            {/* Viewports Rendering Area */}
-            {dimensionMode === '3d' && (
-              <div className="w-full flex flex-col items-center">
-                <AtomViewer3D
-                  protons={protons}
-                  neutrons={neutrons}
-                  electrons={electrons}
-                  elementSymbol={currentElement.symbol}
-                  elementName={t(currentElement.name, currentElement.englishName)}
-                  isStable={isStable}
-                  showSpinArrows={showSpinArrows}
-                  orbitSpeed={orbitSpeed}
-                />
-              </div>
-            )}
-
-            {dimensionMode === '2d' && (
-              <div className="relative w-full aspect-square max-w-[340px] sm:max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
-                <canvas
-                  ref={canvasRef}
-                  width={420}
-                  height={420}
-                  className="w-full h-full"
-                />
-              </div>
-            )}
-
-            {dimensionMode === 'split' && (
-              <div className="w-full grid grid-cols-1 xl:grid-cols-2 gap-4 items-center justify-center">
-                {/* 3D Model Card */}
-                <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-cyan-400 flex items-center gap-1 self-start px-1">
-                    <Box className="w-3 h-3" />
-                    <span>{t('النموذج الفضائي ثلاثي الأبعاد (اسحب للف والدوران)', '3D Spatial Model (Drag to rotate)')}</span>
-                  </span>
+            {/* Viewport Rendering Area (3D or 2D) */}
+            <div className="w-full flex flex-col items-center justify-center animate-fadeIn">
+              {dimensionMode === '3d' ? (
+                <div className="w-full flex flex-col items-center">
                   <AtomViewer3D
+                    key="atom-3d-main"
                     protons={protons}
                     neutrons={neutrons}
                     electrons={electrons}
@@ -928,25 +887,21 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                     isStable={isStable}
                     showSpinArrows={showSpinArrows}
                     orbitSpeed={orbitSpeed}
+                    dimensionMode={dimensionMode}
                   />
                 </div>
-
-                {/* 2D Bohr Diagram Card */}
-                <div className="flex flex-col items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-slate-300 self-start px-1">
-                    {t('مخطط مستويات الطاقة لبور 2D (K, L, M, N...)', '2D Bohr Energy Shells Diagram')}
-                  </span>
-                  <div className="relative w-full aspect-square max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
-                    <canvas
-                      ref={canvasRef}
-                      width={420}
-                      height={420}
-                      className="w-full h-full"
-                    />
-                  </div>
+              ) : (
+                <div className="relative w-full aspect-square max-w-[340px] sm:max-w-[420px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+                  <canvas
+                    key="atom-canvas-2d-main"
+                    ref={canvasRef}
+                    width={420}
+                    height={420}
+                    className="w-full h-full block"
+                  />
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="w-full flex items-center justify-between px-1 mt-3 text-[11px] text-slate-400">
               <span className="flex items-center gap-1.5">

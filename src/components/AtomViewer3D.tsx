@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
-interface AtomViewer3DProps {
+export interface AtomViewer3DProps {
   protons: number;
   neutrons: number;
   electrons: number;
@@ -24,6 +24,7 @@ interface AtomViewer3DProps {
   isStable: boolean;
   showSpinArrows: boolean;
   orbitSpeed: number;
+  dimensionMode?: '3d' | '2d';
 }
 
 type ModelViewType = 'bohr_spatial' | 'quantum_cloud' | 'rutherford';
@@ -36,7 +37,8 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
   elementName,
   isStable,
   showSpinArrows,
-  orbitSpeed
+  orbitSpeed,
+  dimensionMode = '3d'
 }) => {
   const { theme, t } = useApp();
   const isDark = theme === 'dark';
@@ -333,21 +335,21 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
           if (showSpinArrows) {
             arrowGroup = new THREE.Group();
             
-            // Tangent Arrow head (Cone)
-            const coneGeo = new THREE.ConeGeometry(0.5, 1.4, 8);
+            // Tangent Arrow head (Cone) & shaft
+            const coneGeo = new THREE.ConeGeometry(0.7, 1.8, 12);
             coneGeo.rotateX(Math.PI / 2); // point forward
             const arrowMat = new THREE.MeshBasicMaterial({
-              color: isSpinUp ? 0x67e8f9 : 0xfdba74
+              color: isSpinUp ? 0x38bdf8 : 0xf97316
             });
             const coneMesh = new THREE.Mesh(coneGeo, arrowMat);
-            coneMesh.position.set(0, 0, 1.2);
+            coneMesh.position.set(0, 0, 2.4);
             arrowGroup.add(coneMesh);
 
             // Small shaft line
-            const shaftGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 6);
+            const shaftGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.8, 8);
             shaftGeo.rotateX(Math.PI / 2);
             const shaftMesh = new THREE.Mesh(shaftGeo, arrowMat);
-            shaftMesh.position.set(0, 0, 0);
+            shaftMesh.position.set(0, 0, 1.2);
             arrowGroup.add(shaftMesh);
 
             eGroup.add(arrowGroup);
@@ -429,19 +431,19 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
           let arrowGroup: THREE.Group | undefined;
           if (showSpinArrows) {
             arrowGroup = new THREE.Group();
-            const coneGeo = new THREE.ConeGeometry(0.5, 1.4, 8);
+            const coneGeo = new THREE.ConeGeometry(0.7, 1.8, 12);
             coneGeo.rotateX(Math.PI / 2);
             const arrowMat = new THREE.MeshBasicMaterial({
-              color: isSpinUp ? 0x67e8f9 : 0xfdba74
+              color: isSpinUp ? 0x38bdf8 : 0xf97316
             });
             const coneMesh = new THREE.Mesh(coneGeo, arrowMat);
-            coneMesh.position.set(0, 0, 1.2);
+            coneMesh.position.set(0, 0, 2.4);
             arrowGroup.add(coneMesh);
 
-            const shaftGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.4, 6);
+            const shaftGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.8, 8);
             shaftGeo.rotateX(Math.PI / 2);
             const shaftMesh = new THREE.Mesh(shaftGeo, arrowMat);
-            shaftMesh.position.set(0, 0, 0);
+            shaftMesh.position.set(0, 0, 1.2);
             arrowGroup.add(shaftMesh);
 
             eGroup.add(arrowGroup);
@@ -574,21 +576,17 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
 
         eData.mesh.position.copy(localPos);
 
-        // Orient 3D Direction Arrow along instantaneous tangent velocity vector
+        // Orient 3D Direction Arrow strictly along instantaneous tangent velocity vector
         if (eData.arrowGroup && showSpinArrows) {
-          // Tangent vector on circle
           const tangentDir = eData.speed >= 0 ? 1 : -1;
           const tangentLocal = new THREE.Vector3(
             -Math.sin(eData.angle) * tangentDir,
             0,
             Math.cos(eData.angle) * tangentDir
-          ).normalize();
+          ).normalize().applyEuler(euler);
 
-          tangentLocal.applyEuler(euler);
-          
-          // Look along tangent
-          const targetPoint = localPos.clone().add(tangentLocal);
-          eData.arrowGroup.lookAt(targetPoint);
+          // Direct local orientation from +Z forward to tangentLocal
+          eData.arrowGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangentLocal);
         }
       });
 
@@ -609,15 +607,22 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
       if (!container || !renderer || !camera) return;
       const newW = container.clientWidth;
       const newH = container.clientHeight;
+      if (newW <= 0 || newH <= 0) return;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
       renderer.setSize(newW, newH);
     };
 
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(container);
+
     window.addEventListener('resize', handleResize);
 
     // Cleanup on unmount or dependency change
     return () => {
+      resizeObserver.disconnect();
       window.removeEventListener('resize', handleResize);
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
@@ -636,7 +641,8 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
     showSpinArrows,
     orbitSpeed,
     autoRotate,
-    isStable
+    isStable,
+    dimensionMode
   ]);
 
   // Mouse & Touch Orbit Controls Handlers

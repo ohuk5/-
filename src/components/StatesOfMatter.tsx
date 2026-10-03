@@ -19,7 +19,8 @@ import {
   Layers,
   Info,
   BookOpen,
-  Check
+  Check,
+  Box
 } from 'lucide-react';
 import { toEnglishDigits } from '../utils/numberUtils';
 import {
@@ -31,6 +32,7 @@ import {
   calculateEffectiveMeltingPoint
 } from '../data/substancesData';
 import { useApp } from '../context/AppContext';
+import { StatesOfMatter3D } from './StatesOfMatter3D';
 
 interface Particle {
   x: number;
@@ -61,7 +63,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
   const [pressureAtm, setPressureAtm] = useState<number>(1.02);
   const [burnerActive, setBurnerActive] = useState<'heat' | 'cool' | null>(null);
   const [isVenting, setIsVenting] = useState<boolean>(false);
-  const [isDraggingPiston, setIsDraggingPiston] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d'); // 3D or 2D mode
 
   // Exact Temperature Input State (as requested by user)
   const [tempUnit, setTempUnit] = useState<'K' | 'C'>('K');
@@ -191,6 +193,85 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
     else if (preset === 'jupiter') setGravityValue(2.5);
     else if (preset === 'zero') setGravityValue(0.0);
   };
+
+  // Continuous Core Physics & Thermodynamic State Engine (Active in both 3D & 2D views)
+  useEffect(() => {
+    let animId: number;
+    let lastTime = performance.now();
+    let lastPressureUpdate = 0;
+
+    const updateThermodynamics = (now: number) => {
+      const dt = Math.min(0.06, (now - lastTime) / 1000);
+      lastTime = now;
+
+      // 1. Smooth convergence of actualTemp towards targetTemp
+      setActualTemp(prevTemp => {
+        const diff = targetTemp - prevTemp;
+        if (Math.abs(diff) < 0.25) return targetTemp;
+        // Thermal convergence speed proportional to temperature difference
+        const rate = Math.max(0.05, Math.min(0.25, Math.abs(diff) / 1000));
+        return prevTemp + diff * (rate + dt * 4.0);
+      });
+
+      // 2. High-Precision Physical Pressure Calculation (Throttle slightly to 30ms for smooth 30fps gauge updates)
+      if (now - lastPressureUpdate > 30) {
+        lastPressureUpdate = now;
+
+        const vPercent = Math.max(18, Math.min(100, volumeLidPercent));
+        const vRatio = vPercent / 75.0; // calibrated so 75% volume = 1.0
+        const nRatio = particleCount / 45.0; // calibrated so 45 particles = 1.0
+        const tRatio = Math.max(0.01, actualTemp / 293.15); // calibrated so 293.15K = 1.0
+
+        // Ideal gas kinetic collision base pressure (Gay-Lussac & Boyle laws)
+        let pBase = (1.013 * nRatio * tRatio) / vRatio;
+
+        // Substance phase thermodynamic modifications:
+        const currentPhase = phaseInfo.phase;
+        if (currentPhase === 'liquid') {
+          // Vapor pressure in equilibrium with liquid (Clausius-Clapeyron equation)
+          const tBoil = substance.boilingPointK;
+          const normT = Math.min(1.0, actualTemp / tBoil);
+          const vaporP = Math.pow(normT, 4.2) * 1.013;
+          // Compression of gas headspace above the liquid:
+          const liquidFillPercent = 25;
+          const headspaceRatio = Math.max(0.12, (vPercent - liquidFillPercent) / (75 - liquidFillPercent));
+          pBase = (vaporP * 0.70 + (0.30 * nRatio * tRatio) / headspaceRatio);
+        } else if (currentPhase === 'solid') {
+          if (substance.isSublimating) {
+            // Sublimating substances (Dry Ice CO2 / Iodine) develop high sublimation pressure
+            const tSub = substance.meltingPointK;
+            const ratio = Math.max(0, actualTemp / tSub);
+            pBase = Math.min(6.5, Math.pow(ratio, 3.8) * 0.95 + 0.12) / vRatio;
+          } else {
+            // Normal solid: very low vapor pressure + small residual headspace pressure
+            const solidVaporP = 0.08 + 0.18 * (actualTemp / substance.meltingPointK);
+            pBase = Math.min(pBase * 0.25, solidVaporP) / Math.max(0.3, vRatio);
+          }
+        }
+
+        // If safety venting is active, pressure bleeds rapidly to external atmospheric pressure (1.00 Atm)
+        if (isVenting) {
+          pBase = 1.00 + (pBase - 1.00) * 0.15;
+        }
+
+        // Subtle live kinetic molecular fluctuation (±0.012 Atm) to simulate real sensor sampling
+        const jitter = (Math.sin(now * 0.009) * 0.012 + Math.cos(now * 0.021) * 0.008) * (currentPhase === 'gas' ? 1.0 : 0.4);
+        const finalP = Math.max(0.05, Math.min(8.5, parseFloat((pBase + jitter).toFixed(2))));
+
+        setPressureAtm(finalP);
+
+        // Auto-vent safety relief valve if pressure exceeds 7.5 Atm
+        if (finalP >= 7.5 && !isVenting) {
+          triggerVent();
+        }
+      }
+
+      animId = requestAnimationFrame(updateThermodynamics);
+    };
+
+    animId = requestAnimationFrame(updateThermodynamics);
+    return () => cancelAnimationFrame(animId);
+  }, [targetTemp, actualTemp, volumeLidPercent, particleCount, substance, phaseInfo.phase, isVenting]);
 
   // Phase transition detector
   useEffect(() => {
@@ -518,13 +599,6 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
       const scale = Math.sqrt(desiredKE / (avgKE + 0.001));
       const velocityScale = Math.max(0.7, Math.min(1.3, scale));
 
-      // Gradual convergence of actualTemp towards targetTemp
-      setActualTemp(prev => {
-        const diff = targetTemp - prev;
-        if (Math.abs(diff) < 0.4) return targetTemp;
-        return prev + diff * 0.08;
-      });
-
       // Calculate Center of Mass for Zero-G cohesion
       let comX = 0;
       let comY = 0;
@@ -671,32 +745,8 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         }
       }
 
-      // Pressure calculation
-      const vesselHeight = bottomWall - lidY;
-      const vesselArea = (rightWall - leftWall) * vesselHeight;
-      const kineticP = (momentumExchangeRef.current / (vesselArea + 1)) * 11000;
+      // Kinetic collisions reset
       momentumExchangeRef.current = 0;
-
-      rollingPressureRef.current.push(kineticP);
-      if (rollingPressureRef.current.length > 20) {
-        const avgKinetic =
-          rollingPressureRef.current.reduce((a, b) => a + b, 0) /
-          rollingPressureRef.current.length;
-        rollingPressureRef.current = [];
-
-        const volFraction = vesselHeight / (bottomWall - 40);
-        let baseP = (n * (actualTemp / 300)) / (volFraction * 45);
-
-        if (currentP === 'solid') baseP *= 0.15;
-        if (currentP === 'liquid') baseP *= 0.45;
-
-        const calculatedAtm = Math.max(0.08, parseFloat((baseP * 0.7 + avgKinetic * 0.3).toFixed(2)));
-        setPressureAtm(calculatedAtm);
-
-        if (calculatedAtm > 7.5 && !isVenting) {
-          triggerVent();
-        }
-      }
 
       // RENDER MOLECULES & ATOMS (Supporting all 12 substances including Gold and Bromine!)
       particles.forEach(p => {
@@ -855,7 +905,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
       isRunning = false;
       cancelAnimationFrame(animId);
     };
-  }, [substance, targetTemp, gravityValue, volumeLidPercent, phaseInfo.phase, burnerActive, isVenting, theme]);
+  }, [substance, targetTemp, gravityValue, volumeLidPercent, phaseInfo.phase, burnerActive, isVenting, theme, viewMode]);
 
   // Jump to specific state presets
   const jumpToPhase = (phase: 'solid' | 'liquid' | 'gas') => {
@@ -880,74 +930,6 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
     const ratio = Math.max(0, Math.min(1, clickX / rect.width));
     const newTemp = Math.round(ratio * maxScaleK);
     setTargetTemp(Math.max(5, newTemp));
-  };
-
-  // Dragging the Piston on Canvas
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const clickY = e.clientY - rect.top;
-    const h = canvas.height;
-    const currentLidY = 40 + ((100 - volumeLidPercent) * (h - 100)) / 100;
-
-    if (Math.abs(clickY - currentLidY) < 30 || clickY < currentLidY) {
-      setIsDraggingPiston(true);
-    }
-  };
-
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDraggingPiston) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const currentY = e.clientY - rect.top;
-    const h = canvas.height;
-
-    const clampedY = Math.max(40, Math.min(h - 60, currentY));
-    const newVol = Math.round(100 - ((clampedY - 40) / (h - 100)) * 100);
-    applyAdiabaticVolumeChange(Math.max(25, Math.min(100, newVol)));
-  };
-
-  const handleCanvasMouseUp = () => {
-    setIsDraggingPiston(false);
-  };
-
-  // Touch handlers for mobile devices
-  const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || e.touches.length === 0) return;
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const clickY = touch.clientY - rect.top;
-    const h = canvas.height;
-    const scaleY = h / rect.height;
-    const internalY = clickY * scaleY;
-    const currentLidY = 40 + ((100 - volumeLidPercent) * (h - 100)) / 100;
-
-    if (Math.abs(internalY - currentLidY) < 50 || internalY < currentLidY) {
-      setIsDraggingPiston(true);
-    }
-  };
-
-  const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDraggingPiston) return;
-    const canvas = canvasRef.current;
-    if (!canvas || e.touches.length === 0) return;
-    const touch = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const currentY = touch.clientY - rect.top;
-    const h = canvas.height;
-    const scaleY = h / rect.height;
-    const internalY = currentY * scaleY;
-
-    const clampedY = Math.max(40, Math.min(h - 60, internalY));
-    const newVol = Math.round(100 - ((clampedY - 40) / (h - 100)) * 100);
-    applyAdiabaticVolumeChange(Math.max(25, Math.min(100, newVol)));
-  };
-
-  const handleCanvasTouchEnd = () => {
-    setIsDraggingPiston(false);
   };
 
   const runExperiment = (exp: 'space_drop' | 'pressure_cooker' | 'co2_sublime' | 'mercury_liquid' | 'gold_melt' | 'bromine_vapor') => {
@@ -1342,78 +1324,189 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
           <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
-            {/* Top State Badge & Manometer */}
-            <div className="w-full flex items-center justify-between mb-3 px-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 font-medium">{t('الحالة:', 'Phase:')}</span>
-                <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black border ${phaseInfo.badgeClass}`}>
-                  {phaseInfo.phaseName}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${pressureAtm > 4.5 ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-slate-950 text-cyan-400 border border-slate-800'}`}>
-                  P = {pressureAtm.toFixed(2)} Atm
-                </span>
+            {/* Top Toolbar: View Mode Switcher, Phase Badge & Manometer */}
+            <div className="w-full flex flex-wrap items-center justify-between gap-2.5 mb-3 px-1">
+              {/* View Mode Switcher (3D أو 2D فقط) */}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950/80 border border-slate-800 shadow-inner">
                 <button
-                  onClick={triggerVent}
-                  title="صمام تفريغ الأمان لتخفيف الضغط"
-                  className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 font-bold flex items-center gap-1"
+                  type="button"
+                  onClick={() => setViewMode('3d')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    viewMode === '3d'
+                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                  title={t('حجرة ثلاثية الأبعاد 3D', '3D Chamber View')}
                 >
-                  <Wind className="w-3 h-3 text-cyan-400" />
-                  <span>{t('تفريغ', 'Vent')}</span>
+                  <Box className="w-3.5 h-3.5 text-purple-300" />
+                  <span>{t('ثلاثي الأبعاد 3D', '3D View')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('2d')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    viewMode === '2d'
+                      ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  }`}
+                  title={t('مخطط ثنائي الأبعاد 2D', '2D Canvas View')}
+                >
+                  <span>2D {t('ثنائي الأبعاد', '2D')}</span>
                 </button>
               </div>
-            </div>
 
-            {/* Interactive Canvas Stage */}
-            <div className="relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border-2 border-slate-700/60 rounded-xl overflow-hidden shadow-2xl">
-              <canvas
-                ref={canvasRef}
-                width={460}
-                height={345}
-                onMouseDown={handleCanvasMouseDown}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseUp={handleCanvasMouseUp}
-                onTouchStart={handleCanvasTouchStart}
-                onTouchMove={handleCanvasTouchMove}
-                onTouchEnd={handleCanvasTouchEnd}
-                className="w-full h-full relative z-10 cursor-ns-resize touch-none select-none"
-              />
-              <div className="absolute top-2 left-2 z-20 pointer-events-none text-[10px] text-slate-300 bg-slate-900/80 px-2 py-1 rounded border border-slate-800 flex items-center gap-1">
-                <span>↕</span>
-                <span>{t('اسحب المكبس باللمس أو الماوس', 'Drag piston by touch or mouse')}</span>
+              {/* State Badge & Pressure Manometer */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-400 font-medium">{t('الحالة:', 'Phase:')}</span>
+                  <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black border ${phaseInfo.badgeClass}`}>
+                    {phaseInfo.phaseName}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${pressureAtm > 4.5 ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-slate-950 text-cyan-400 border border-slate-800'}`}>
+                    P = {pressureAtm.toFixed(2)} Atm
+                  </span>
+                  <button
+                    onClick={triggerVent}
+                    title="صمام تفريغ الأمان لتخفيف الضغط"
+                    className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 font-bold flex items-center gap-1"
+                  >
+                    <Wind className="w-3 h-3 text-cyan-400" />
+                    <span>{t('تفريغ', 'Vent')}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Direct Piston Controls (For Mobile & Precision) */}
-            <div className={`w-full mt-3 p-2.5 rounded-xl border flex items-center justify-between gap-2 ${
-              isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+            {/* Viewport Rendering Area (3D or 2D) */}
+            <div className="w-full flex flex-col items-center justify-center animate-fadeIn">
+              {viewMode === '3d' ? (
+                <div className="w-full aspect-[4/3] max-w-[460px] rounded-xl overflow-hidden shadow-2xl border-2 border-slate-700/60 bg-slate-950">
+                  <StatesOfMatter3D
+                    key={`som-3d-${substance.id}`}
+                    substance={substance}
+                    actualTemp={actualTemp}
+                    pressureAtm={pressureAtm}
+                    volumeLidPercent={volumeLidPercent}
+                    gravityValue={gravityValue}
+                    phase={phaseInfo.phase}
+                    phaseName={phaseInfo.phaseName}
+                    particleCount={particleCount}
+                    burnerActive={burnerActive}
+                  />
+                </div>
+              ) : (
+                <div className="relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border-2 border-slate-700/60 rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
+                  <canvas
+                    key="som-canvas-2d"
+                    ref={canvasRef}
+                    width={460}
+                    height={345}
+                    className="w-full h-full relative z-10 select-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Piston & Volume Slider (شريط تحكم المكبس والحجم المباشر) */}
+            <div className={`w-full mt-3 p-3.5 rounded-xl border flex flex-col gap-2.5 ${
+              isDark ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-50 border-slate-200'
             }`}>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-400">{t('المكبس والحجم:', 'Piston & Volume:')}</span>
-                <span className="text-xs font-mono font-black text-cyan-400">{volumeLidPercent}%</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Gauge className="w-4 h-4 text-cyan-400" />
+                    <span>{t('شريط التحكم في المكبس والحجم:', 'Piston & Volume Slider:')}</span>
+                  </span>
+                  <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    {volumeLidPercent}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] font-mono text-slate-400">
+                  <span>{pressureAtm > 2.5 ? t('ضغط مرتفع 🔥', 'High P 🔥') : pressureAtm < 0.6 ? t('ضغط منخفض 🌌', 'Low P 🌌') : t('ضغط معتدل', 'Normal P')}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
+
+              {/* Smooth Range Slider */}
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => applyAdiabaticVolumeChange(Math.max(25, volumeLidPercent - 15))}
-                  disabled={volumeLidPercent <= 25}
-                  className="px-2.5 py-1 rounded-lg bg-orange-950/80 hover:bg-orange-900/80 border border-orange-700/60 text-orange-200 text-xs font-bold disabled:opacity-40 transition-all flex items-center gap-1 shadow-xs active:scale-95"
-                  title={t('كبس المكبس للأسفل (رفع الضغط)', 'Compress Piston Down (Raise Pressure)')}
+                  onClick={() => applyAdiabaticVolumeChange(Math.max(20, volumeLidPercent - 5))}
+                  disabled={volumeLidPercent <= 20}
+                  className="p-1.5 rounded-lg bg-orange-950/80 hover:bg-orange-900 border border-orange-700/60 text-orange-300 disabled:opacity-30 transition-all text-xs font-bold"
+                  title={t('كبس المكبس (-5%)', 'Compress Piston (-5%)')}
                 >
-                  <span>⬇</span>
-                  <span className="text-[11px]">{t('كبس المكبس', 'Compress')}</span>
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="flex-1 flex flex-col gap-1">
+                  <input
+                    type="range"
+                    min={20}
+                    max={100}
+                    step={1}
+                    value={volumeLidPercent}
+                    onChange={(e) => applyAdiabaticVolumeChange(Number(e.target.value))}
+                    className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>20% ({t('أقصى كبس', 'Max')})</span>
+                    <span>50%</span>
+                    <span>75% ({t('عادي', 'Normal')})</span>
+                    <span>100% ({t('مفرغ', 'Vacuum')})</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => applyAdiabaticVolumeChange(Math.min(100, volumeLidPercent + 5))}
+                  disabled={volumeLidPercent >= 100}
+                  className="p-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-300 disabled:opacity-30 transition-all text-xs font-bold"
+                  title={t('رفع المكبس (+5%)', 'Raise Piston (+5%)')}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Quick Piston Presets */}
+              <div className="grid grid-cols-4 gap-1.5 pt-1 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  onClick={() => setPressurePreset('extreme')}
+                  className={`py-1 px-1.5 rounded-lg border text-[11px] font-bold transition-all text-center ${
+                    volumeLidPercent <= 25 ? 'bg-red-950/80 border-red-600 text-red-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {t('كبس شديد 25%', 'Extreme 25%')}
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyAdiabaticVolumeChange(Math.min(100, volumeLidPercent + 15))}
-                  disabled={volumeLidPercent >= 100}
-                  className="px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-700/60 text-cyan-200 text-xs font-bold disabled:opacity-40 transition-all flex items-center gap-1 shadow-xs active:scale-95"
-                  title={t('رفع المكبس للأعلى (تخفيف الضغط)', 'Raise Piston Up (Reduce Pressure)')}
+                  onClick={() => setPressurePreset('cooker')}
+                  className={`py-1 px-1.5 rounded-lg border text-[11px] font-bold transition-all text-center ${
+                    volumeLidPercent > 25 && volumeLidPercent <= 45 ? 'bg-orange-950/80 border-orange-600 text-orange-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  <span>⬆</span>
-                  <span className="text-[11px]">{t('رفع المكبس', 'Expand')}</span>
+                  {t('قدر ضغط 35%', 'Cooker 35%')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPressurePreset('normal')}
+                  className={`py-1 px-1.5 rounded-lg border text-[11px] font-bold transition-all text-center ${
+                    volumeLidPercent > 45 && volumeLidPercent <= 85 ? 'bg-cyan-950/80 border-cyan-600 text-cyan-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {t('حجم معتدل 75%', 'Normal 75%')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPressurePreset('vacuum')}
+                  className={`py-1 px-1.5 rounded-lg border text-[11px] font-bold transition-all text-center ${
+                    volumeLidPercent > 85 ? 'bg-purple-950/80 border-purple-600 text-purple-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {t('تفريغ 100%', 'Vacuum 100%')}
                 </button>
               </div>
             </div>

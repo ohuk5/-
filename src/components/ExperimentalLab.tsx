@@ -23,9 +23,11 @@ import {
   FileText,
   Clock,
   Activity,
-  Zap
+  Zap,
+  Box
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { LabViewer3D } from './LabViewer3D';
 
 // Reagent definition for safe chemical lab
 interface LabReagent {
@@ -238,6 +240,39 @@ const REAGENTS: LabReagent[] = [
     phValue: 7.0,
     descAr: 'وقود كحولي شفاف قابل للاشتعال، يشتعل بلهب أزرق وأصفر هادئ وجميل عند إطلاق شرارة الإشعال!',
     descEn: 'Clear flammable alcohol fuel; burns with luminous blue and orange flame when ignited by spark!'
+  },
+  {
+    id: 'acetic_acid',
+    nameAr: 'حمض الخليك المخفف (حمض الأسيتيك)',
+    nameEn: 'Dilute Acetic Acid (Vinegar)',
+    formula: 'CH₃COOH (0.1M)',
+    type: 'liquid',
+    defaultColor: 'rgba(254, 249, 195, 0.4)',
+    phValue: 2.9,
+    descAr: 'حمض كربوكسيلي عضوي ضعيف؛ يوضح الفرق بين الأحماض الضعيفة والأحماض القوية في التأين والتوصيل الكهربائي.',
+    descEn: 'Weak organic acid demonstrating partial ionization and weak electrical conductivity compared to HCl.'
+  },
+  {
+    id: 'strontium_chloride',
+    nameAr: 'مسحوق كلوريد السترونشيوم',
+    nameEn: 'Strontium Chloride',
+    formula: 'SrCl₂',
+    type: 'powder',
+    defaultColor: '#f8fafc',
+    phValue: 7.0,
+    descAr: 'ملح فلزي يعطي اختبار لهب أحمر قرمزي متوهج (Crimson Red)، ويستخدم في الألعاب النارية والإشارات الضوئية.',
+    descEn: 'Metal salt giving an intense brilliant crimson-red flame test emission, used in pyrotechnics and flares.'
+  },
+  {
+    id: 'barium_chloride',
+    nameAr: 'مسحوق كلوريد الباريوم',
+    nameEn: 'Barium Chloride',
+    formula: 'BaCl₂',
+    type: 'powder',
+    defaultColor: '#ffffff',
+    phValue: 6.8,
+    descAr: 'ملح تحليلي يعطي اختبار لهب أخضر تفاحي باهر (Apple Green)، ويكوّن راسب كبريتات الباريوم غير القابل للذوبان إطلاقاً في الأحماض.',
+    descEn: 'Analytical salt producing a distinctive apple-green flame test and insoluble white barium sulfate precipitate.'
   }
 ];
 
@@ -262,6 +297,9 @@ interface BeakerContent {
   magnesiumG: number;
   ethanolMl: number;
   hydrogenGasMl: number;
+  aceticAcidMl: number;
+  strontiumG: number;
+  bariumG: number;
 }
 
 export const ExperimentalLab: React.FC = () => {
@@ -271,6 +309,9 @@ export const ExperimentalLab: React.FC = () => {
   // Mode: Guided Missions vs Open Sandbox
   const [labMode, setLabMode] = useState<'open_sandbox' | 'guided'>('open_sandbox');
 
+  // Viewport Dimension Mode: 3D Virtual Lab vs 2D Canvas
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d');
+
   // Interactive Tools Toggles & States
   const [burnerPower, setBurnerPower] = useState<'off' | 'low' | 'med' | 'high'>('off');
   const [isStirring, setIsStirring] = useState<boolean>(false);
@@ -279,6 +320,9 @@ export const ExperimentalLab: React.FC = () => {
   const [litmusStripDipped, setLitmusStripDipped] = useState<boolean>(false);
   const [isSoundMuted, setIsSoundMuted] = useState<boolean>(false);
   const [isEthanolBurning, setIsEthanolBurning] = useState<boolean>(false);
+  const [isConductivityActive, setIsConductivityActive] = useState<boolean>(false);
+  const [flameTestMetal, setFlameTestMetal] = useState<string>('none');
+  const [isFlameTestSelectorOpen, setIsFlameTestSelectorOpen] = useState<boolean>(false);
   
   // Precision Dosage & Dispensing Controls (Every single mL controlled freely!)
   const [dispenseMode, setDispenseMode] = useState<'ml' | 'drop' | 'gram'>('ml');
@@ -308,12 +352,16 @@ export const ExperimentalLab: React.FC = () => {
     potassiumG: 0,
     magnesiumG: 0,
     ethanolMl: 0,
-    hydrogenGasMl: 0
+    hydrogenGasMl: 0,
+    aceticAcidMl: 0,
+    strontiumG: 0,
+    bariumG: 0
   });
 
   // Physical State of the Liquid in Beaker
   const [currentTempC, setCurrentTempC] = useState<number>(23.5); // Room temp
   const [effervescenceBubbles, setEffervescenceBubbles] = useState<number>(0);
+  const [dispenseAnimCounter, setDispenseAnimCounter] = useState<number>(0);
   const [lastActionMessage, setLastActionMessage] = useState<string>(
     lang === 'ar' ? 'المعمل جاهز للبدء. أضف المواد أو شغّل الأدوات بحرية.' : 'Lab ready. Add reagents or activate tools freely.'
   );
@@ -327,6 +375,9 @@ export const ExperimentalLab: React.FC = () => {
   const bubbleParticlesRef = useRef<{ x: number; y: number; vy: number; radius: number; opacity: number }[]>([]);
   const steamParticlesRef = useRef<{ x: number; y: number; vx: number; vy: number; radius: number; opacity: number }[]>([]);
   const stirAngleRef = useRef<number>(0);
+  const isDraggingRodRef = useRef<boolean>(false);
+  const rodDragPosRef = useRef<{ x: number; y: number } | null>(null);
+  const stirTimeoutRef = useRef<number | null>(null);
   const skitteringPelletsRef = useRef<Array<{ x: number; y: number; vx: number; type: 'sodium' | 'potassium'; life: number; maxLife: number }>>([]);
 
   // Total Volume calculation (ml)
@@ -340,6 +391,7 @@ export const ExperimentalLab: React.FC = () => {
       content.silverNitrateMl +
       content.ammoniaMl +
       content.ethanolMl +
+      (content.aceticAcidMl || 0) +
       content.iceCount * 8
   );
 
@@ -356,8 +408,34 @@ export const ExperimentalLab: React.FC = () => {
     content.sodiumG +
     content.potassiumG +
     content.magnesiumG +
+    (content.strontiumG || 0) +
+    (content.bariumG || 0) +
     content.ethanolMl * 0.79;
   const displayedWeightG = Math.max(0, rawMassG - balanceTare);
+
+  // Electrical Conductivity Evaluation (Electrolyte Ion Dissociation)
+  const conductivityGlow = React.useMemo(() => {
+    if (!isConductivityActive) return 0;
+    // Strong electrolytes
+    const strongIons =
+      content.acidMl +
+      content.baseMl +
+      content.copperSulfateMl +
+      content.silverNitrateMl +
+      content.calciumChlorideG +
+      (content.bariumG || 0) +
+      (content.strontiumG || 0);
+    // Weak electrolytes
+    const weakIons = (content.aceticAcidMl || 0) + content.bakingSodaG * 0.4 + content.ammoniaMl;
+
+    if (strongIons > 0) {
+      return Math.min(1.0, 0.45 + strongIons * 0.04);
+    }
+    if (weakIons > 0) {
+      return Math.min(0.40, 0.15 + weakIons * 0.02);
+    }
+    return 0; // Pure water, ice, ethanol
+  }, [isConductivityActive, content]);
 
   // Explosion, Combustion & Pour Animation Engine
   const explosionsRef = useRef<Array<{
@@ -581,7 +659,7 @@ export const ExperimentalLab: React.FC = () => {
 
     // 0. Potassium Permanganate (Royal Deep Violet/Purple)
     if (content.permanganateG > 0) {
-      return 'rgba(126, 34, 206, 0.88)';
+      return 'rgba(126, 34, 206, 0.90)';
     }
 
     // 0.1 Tetraamminecopper(II) Complex (Royal Deep Navy Blue)
@@ -591,43 +669,56 @@ export const ExperimentalLab: React.FC = () => {
 
     // 0.2 Silver Chloride Precipitate (Dense Milky White Suspension)
     if (content.silverNitrateMl > 0 && (content.acidMl > 0 || content.calciumChlorideG > 0)) {
-      return 'rgba(241, 245, 249, 0.92)';
+      return 'rgba(248, 250, 252, 0.94)';
     }
 
     // 1. Phenolphthalein indicator effect: Turns bright magenta-pink if pH > 8.2
     if (content.phenolphthaleinDrops > 0 && currentPh >= 8.2) {
-      const pinkOpacity = Math.min(0.9, 0.4 + (currentPh - 8.2) * 0.2);
+      const pinkOpacity = Math.min(0.95, 0.6 + (currentPh - 8.2) * 0.2);
       return `rgba(236, 72, 153, ${pinkOpacity})`;
     }
 
     // 2. Universal indicator spectrum:
     if (content.universalDrops > 0) {
-      if (currentPh < 3) return 'rgba(239, 68, 68, 0.75)'; // Red
-      if (currentPh < 5) return 'rgba(249, 115, 22, 0.75)'; // Orange
-      if (currentPh < 6.5) return 'rgba(234, 179, 8, 0.75)'; // Yellow
-      if (currentPh <= 7.5) return 'rgba(34, 197, 94, 0.75)'; // Green (Neutral)
-      if (currentPh < 9) return 'rgba(6, 182, 212, 0.75)'; // Cyan
-      if (currentPh < 11) return 'rgba(59, 130, 246, 0.75)'; // Blue
-      return 'rgba(168, 85, 247, 0.85)'; // Violet/Purple
+      if (currentPh < 3) return 'rgba(239, 68, 68, 0.85)'; // Red
+      if (currentPh < 5) return 'rgba(249, 115, 22, 0.85)'; // Orange
+      if (currentPh < 6.5) return 'rgba(234, 179, 8, 0.85)'; // Yellow
+      if (currentPh <= 7.5) return 'rgba(34, 197, 94, 0.85)'; // Green (Neutral)
+      if (currentPh < 9) return 'rgba(6, 182, 212, 0.85)'; // Cyan
+      if (currentPh < 11) return 'rgba(59, 130, 246, 0.85)'; // Blue
+      return 'rgba(168, 85, 247, 0.90)'; // Violet/Purple
     }
 
     // 3. Copper Sulfate (CuSO4):
     if (content.copperSulfateMl > 0) {
       if (content.precipitateG > 0) {
         // Milky sky-blue suspension
-        return 'rgba(125, 211, 252, 0.85)';
+        return 'rgba(125, 211, 252, 0.88)';
       }
-      return 'rgba(37, 99, 235, 0.7)'; // Royal Blue
+      return 'rgba(37, 99, 235, 0.85)'; // Royal Blue
     }
 
-    // 4. Default clear fluid with slight aqua refraction
-    return theme === 'dark' ? 'rgba(56, 189, 248, 0.28)' : 'rgba(186, 230, 253, 0.55)';
+    // 4. Distinct chemical hues for clear reagents so user clearly sees liquid state changes:
+    if (content.acidMl > 0 || (content.aceticAcidMl || 0) > 0) {
+      return 'rgba(253, 224, 71, 0.65)'; // Warm luminous citrus/acid hue
+    }
+    if (content.baseMl > 0 || content.ammoniaMl > 0) {
+      return 'rgba(147, 197, 253, 0.70)'; // Soft azure alkaline hue
+    }
+    if (content.ethanolMl > 0) {
+      return 'rgba(224, 242, 254, 0.65)'; // Crisp crystal alcohol hue
+    }
+
+    // 5. Default pure water: bright crystal-clear aqua with glistening refraction
+    return 'rgba(56, 189, 248, 0.70)';
   };
 
   // Add reagent to beaker with precise user-controlled volume/dose
   const handleAddReagent = (reagentId: string, customAmount?: number) => {
     const reg = REAGENTS.find(r => r.id === reagentId);
     if (!reg) return;
+
+    setDispenseAnimCounter(prev => prev + 1);
 
     if (reg.type === 'liquid' || reg.type === 'indicator') {
       triggerPourAnimation(reg.defaultColor);
@@ -827,6 +918,28 @@ export const ExperimentalLab: React.FC = () => {
       } else if (reagentId === 'ethanol') {
         next.ethanolMl = Math.min(100, next.ethanolMl + amountMl);
         setLastActionMessage(t(`تمت إضافة ${amountMl} مل من الإيثانول النقي القابل للاشتعال. استخدم قادح الشرارة أو الموقد لإشعاله!`, `Added ${amountMl} mL flammable pure ethanol. Strike spark to ignite!`));
+      } else if (reagentId === 'acetic_acid') {
+        next.aceticAcidMl = (next.aceticAcidMl || 0) + amountMl;
+        if (next.bakingSodaG > 0.5) {
+          setEffervescenceBubbles(prevB => Math.min(45, prevB + 22));
+          next.bakingSodaG = Math.max(0, next.bakingSodaG - amountMl * 0.15);
+          setLastActionMessage(t('تفاعل بركاني كلاسيكي ممتع! تفاعل حمض الخليك مع كربونات الصوديوم وتصاعد غاز CO₂.', 'Classic effervescent reaction! Acetic acid effervesced with baking soda releasing CO₂ gas.'));
+        } else {
+          setLastActionMessage(t(`أُضيف ${amountMl} مل من حمض الخليك CH₃COOH (حمض ضعيف جزئي التأين).`, `Added ${amountMl} mL dilute acetic acid CH3COOH (weak electrolyte).`));
+        }
+      } else if (reagentId === 'strontium_chloride') {
+        next.strontiumG = (next.strontiumG || 0) + grams;
+        setFlameTestMetal('strontium');
+        setLastActionMessage(t(`أُضيف ${grams} جم كلوريد السترونشيوم SrCl₂. تم تفعيل اختبار اللهب القرمزي المتوهج (Crimson Red)!`, `Added ${grams} g SrCl2. Enabled brilliant crimson-red flame test!`));
+      } else if (reagentId === 'barium_chloride') {
+        next.bariumG = (next.bariumG || 0) + grams;
+        setFlameTestMetal('barium');
+        if (next.copperSulfateMl > 0) {
+          next.precipitateG = Math.min(35, next.precipitateG + 6.0);
+          setLastActionMessage(t('تفاعل ترسيب تحليلي! تكوّن راسب كبريتات الباريوم BaSO₄ الأبيض غير الذواب، مع انبعاث لهب أخضر تفاحي!', 'Precipitation test! Formed dense white BaSO4 precipitate and enabled apple-green flame!'));
+        } else {
+          setLastActionMessage(t(`أُضيف ${grams} جم كلوريد الباريوم BaCl₂ (يُعطي اختبار لهب أخضر تفاحي باهر).`, `Added ${grams} g BaCl2 (gives distinctive apple-green flame).`));
+        }
       }
 
       return next;
@@ -839,6 +952,7 @@ export const ExperimentalLab: React.FC = () => {
       setLastActionMessage(t('الكأس فارغ بالفعل، لا يوجد سائل لسحبه!', 'Beaker is already empty!'));
       return;
     }
+    setDispenseAnimCounter(prev => prev + 1);
     const ratio = Math.max(0, (totalVolumeMl - amount) / totalVolumeMl);
     setContent(prev => ({
       ...prev,
@@ -877,7 +991,10 @@ export const ExperimentalLab: React.FC = () => {
       potassiumG: 0,
       magnesiumG: 0,
       ethanolMl: 0,
-      hydrogenGasMl: 0
+      hydrogenGasMl: 0,
+      aceticAcidMl: 0,
+      strontiumG: 0,
+      bariumG: 0
     });
     explosionsRef.current = [];
     skitteringPelletsRef.current = [];
@@ -941,18 +1058,116 @@ export const ExperimentalLab: React.FC = () => {
     setLastActionMessage(t('⚡ انطلقت شرارة كهربائية تجريبية داخل الكأس. لا توجد غازات أو أشرطة قابلة للاشتعال حالياً.', '⚡ Electric test spark struck inside beaker. No combustible gases or metals present currently.'));
   };
 
-  // Stir the mixture with the glass rod
+  // Stir the mixture with the authentic glass rod
   const handleStir = () => {
     setIsStirring(true);
-    setLastActionMessage(t('جاري تحريك ومزج المحلول بساق التحريك الزجاجية لتسريع التجانس والذوبان...', 'Stirring solution with glass rod to accelerate homogenization...'));
+    setLastActionMessage(
+      t(
+        'جاري تحريك ومزج المحلول بالعصا الزجاجية بحركة دائرية مستمرة لتسريع التجانس والذوبان...',
+        'Stirring solution in continuous circular motion with the glass rod to accelerate homogenization...'
+      )
+    );
     setTimeout(() => {
       setIsStirring(false);
-      // Dissolve solids partially
+      // Dissolve undissolved salts and homogenize
       setContent(prev => ({
         ...prev,
-        calciumChlorideG: Math.max(0, prev.calciumChlorideG - 2)
+        calciumChlorideG: Math.max(0, prev.calciumChlorideG - 6),
+        bakingSodaG: Math.max(0, prev.bakingSodaG - 6),
+        ironG: Math.max(0, prev.ironG - 3),
+        precipitateG: Math.max(0, prev.precipitateG - 4)
       }));
-    }, 1400);
+      setLastActionMessage(
+        t(
+          '✨ تم خلط وتجانس المحلول بنجاح عبر تحريك العصا الزجاجية المخبرية!',
+          '✨ Solution successfully stirred and homogenized using the laboratory glass rod!'
+        )
+      );
+    }, 2400);
+  };
+
+  // Direct interactive dragging of the glass stirring rod on the canvas
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    // Check if pointer is inside the beaker area
+    const beakerX = 140;
+    const beakerW = 180;
+    const beakerY = 110;
+    const beakerH = 200;
+    if (x >= beakerX - 25 && x <= beakerX + beakerW + 35 && y >= beakerY - 55 && y <= beakerY + beakerH + 10) {
+      isDraggingRodRef.current = true;
+      rodDragPosRef.current = { x, y };
+      setIsStirring(true);
+      try {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDraggingRodRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    rodDragPosRef.current = { x, y };
+    stirAngleRef.current += 0.32;
+
+    if (!isStirring) {
+      setIsStirring(true);
+    }
+
+    // Incremental dissolution as the user keeps moving the rod
+    if (stirTimeoutRef.current) clearTimeout(stirTimeoutRef.current);
+    stirTimeoutRef.current = window.setTimeout(() => {
+      if (isDraggingRodRef.current) {
+        setContent(prev => ({
+          ...prev,
+          calciumChlorideG: Math.max(0, prev.calciumChlorideG - 1.2),
+          bakingSodaG: Math.max(0, prev.bakingSodaG - 1.2),
+          precipitateG: Math.max(0, prev.precipitateG - 1)
+        }));
+      }
+    }, 180);
+  };
+
+  const handleCanvasPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDraggingRodRef.current) return;
+    isDraggingRodRef.current = false;
+    rodDragPosRef.current = null;
+    try {
+      (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
+    } catch {
+      // ignore
+    }
+    setTimeout(() => {
+      setIsStirring(false);
+      setContent(prev => ({
+        ...prev,
+        calciumChlorideG: Math.max(0, prev.calciumChlorideG - 4),
+        bakingSodaG: Math.max(0, prev.bakingSodaG - 4),
+        precipitateG: Math.max(0, prev.precipitateG - 3)
+      }));
+      setLastActionMessage(
+        t(
+          '✨ تم خلط وتجانس المحلول بنجاح عبر تحريك العصا الزجاجية باليد!',
+          '✨ Solution stirred and mixed with the glass rod!'
+        )
+      );
+    }, 600);
   };
 
   // Empty and rinse the beaker with pure distilled water
@@ -977,7 +1192,10 @@ export const ExperimentalLab: React.FC = () => {
       potassiumG: 0,
       magnesiumG: 0,
       ethanolMl: 0,
-      hydrogenGasMl: 0
+      hydrogenGasMl: 0,
+      aceticAcidMl: 0,
+      strontiumG: 0,
+      bariumG: 0
     });
     explosionsRef.current = [];
     skitteringPelletsRef.current = [];
@@ -1156,6 +1374,7 @@ export const ExperimentalLab: React.FC = () => {
 
   // CANVAS ANIMATION LOOP: Render realistic Beaker, Burner, Liquid, Steam, Bubbles
   useEffect(() => {
+    if (viewMode === '3d') return; // Only run 2D canvas animation when 2D or split mode is active!
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -1550,15 +1769,83 @@ export const ExperimentalLab: React.FC = () => {
         ctx.fill();
       }
 
-      // (c) Glass Stirring Rod
-      if (isStirring) {
-        ctx.save();
-        ctx.translate(w / 2, beakerY + 60);
-        ctx.rotate(Math.sin(Date.now() * 0.015) * 0.15);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.fillRect(-3, -70, 6, beakerH - 20);
-        ctx.restore();
+      // (c) Authentic Laboratory Glass Stirring Rod (عصا التحريك الزجاجية المخبرية)
+      let rodTipX: number;
+      let rodTipY: number;
+      let rodTopX: number;
+      let rodTopY: number;
+
+      if (rodDragPosRef.current && isDraggingRodRef.current) {
+        // Direct tracking of the user's cursor / finger dragging
+        rodTipX = Math.max(beakerX + 25, Math.min(beakerX + beakerW - 25, rodDragPosRef.current.x));
+        rodTipY = Math.max(liquidSurfaceY + 12, Math.min(beakerBottomY - 10, rodDragPosRef.current.y));
+        rodTopX = rodTipX + 38;
+        rodTopY = beakerY - 55;
+      } else if (isStirring) {
+        // Automatic animated circular stirring motion through the liquid
+        stirAngleRef.current += 0.22;
+        const stirR = beakerW * 0.28;
+        rodTipX = beakerX + beakerW / 2 + Math.cos(stirAngleRef.current) * stirR;
+        rodTipY = beakerBottomY - 16 + Math.sin(stirAngleRef.current * 2) * 5;
+        rodTopX = beakerX + beakerW / 2 + Math.cos(stirAngleRef.current * 0.5) * 16 + 26;
+        rodTopY = beakerY - 52;
+      } else {
+        // Natural resting position slanted against beaker rim
+        rodTopX = beakerX + beakerW - 18;
+        rodTopY = beakerY - 48;
+        rodTipX = beakerX + 42;
+        rodTipY = beakerBottomY - 14;
       }
+
+      // Draw stirring liquid whirlpool / wake around rod tip when stirring
+      if (isStirring && totalVolumeMl > 0) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.ellipse(rodTipX, rodTipY - 2, 22, 7, stirAngleRef.current, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(rodTipX, rodTipY + 4, 14, 4, -stirAngleRef.current, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Draw Glass Stirring Rod Cylinder Body
+      ctx.save();
+      const rodAngle = Math.atan2(rodTipY - rodTopY, rodTipX - rodTopX);
+      const rodLength = Math.hypot(rodTipX - rodTopX, rodTipY - rodTopY);
+
+      ctx.translate(rodTopX, rodTopY);
+      ctx.rotate(rodAngle - Math.PI / 2);
+
+      // Glass rod linear gradient
+      const rodGrad = ctx.createLinearGradient(-4, 0, 4, 0);
+      rodGrad.addColorStop(0, 'rgba(224, 242, 254, 0.7)');
+      rodGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.95)');
+      rodGrad.addColorStop(0.7, 'rgba(186, 230, 253, 0.65)');
+      rodGrad.addColorStop(1, 'rgba(125, 211, 252, 0.8)');
+
+      ctx.fillStyle = rodGrad;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.8)';
+      ctx.lineWidth = 1.2;
+
+      // Rounded rect rod
+      ctx.beginPath();
+      ctx.roundRect(-4, 0, 8, rodLength, [4, 4, 4, 4]);
+      ctx.fill();
+      ctx.stroke();
+
+      // Specular highlight line along rod center
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(-1.2, 4);
+      ctx.lineTo(-1.2, rodLength - 6);
+      ctx.stroke();
+
+      ctx.restore();
 
       // (d) Dipped Litmus Paper Strip
       if (litmusStripDipped) {
@@ -1731,7 +2018,8 @@ export const ExperimentalLab: React.FC = () => {
     isPhMeterActive,
     litmusStripDipped,
     effervescenceBubbles,
-    theme
+    theme,
+    viewMode
   ]);
 
   return (
@@ -2108,6 +2396,42 @@ export const ExperimentalLab: React.FC = () => {
           <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center relative ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
+            {/* Viewport Dimension Mode Selector (3D / 2D / Split View) */}
+            <div className="w-full flex items-center justify-between pb-2 mb-3 border-b border-slate-800 gap-2 flex-wrap">
+              <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => setViewMode('3d')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    viewMode === '3d'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Box className="w-3.5 h-3.5" />
+                  <span>{t('معمل ثلاثي الأبعاد (3D)', '3D Virtual Lab')}</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('2d')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    viewMode === '2d'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <FlaskConical className="w-3.5 h-3.5" />
+                  <span>{t('المخطط المخبري (2D)', '2D Canvas')}</span>
+                </button>
+              </div>
+
+              {/* Gas Syringe / Volume Indicator */}
+              {content.hydrogenGasMl > 0 && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/60 border border-amber-800/60 text-amber-300 text-xs font-mono font-bold animate-pulse">
+                  <Wind className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{t('غاز H₂ متصاعد:', 'Evolved H₂:')} {content.hydrogenGasMl.toFixed(0)} mL</span>
+                </div>
+              )}
+            </div>
+
             {/* Top Workbench Status Bar */}
             <div className="w-full flex flex-wrap items-center justify-between gap-2 mb-3 text-xs">
               <div className="flex items-center gap-2 font-mono font-bold">
@@ -2162,25 +2486,83 @@ export const ExperimentalLab: React.FC = () => {
               </div>
             </div>
 
-            {/* Central Interactive Laboratory Stage (Canvas) */}
-            <div className="relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border-2 border-slate-700/60 rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
-              <canvas
-                ref={canvasRef}
-                width={460}
-                height={345}
-                className="w-full h-full relative z-10"
-              />
-
-              {/* Action notification floating over beaker */}
-              <div className="absolute top-2 left-2 right-2 z-20 pointer-events-none">
-                <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-md rounded-xl p-2 text-center text-xs font-semibold text-slate-300 shadow-md">
-                  {lastActionMessage}
+            {/* Viewport Rendering Area (3D or 2D) */}
+            <div className="w-full flex flex-col items-center justify-center animate-fadeIn">
+              {viewMode === '3d' ? (
+                <div className="w-full flex flex-col items-center">
+                  <LabViewer3D
+                    key="lab-3d-main"
+                    totalVolumeMl={totalVolumeMl}
+                    fluidColor={getFluidColor()}
+                    currentTempC={currentTempC}
+                    phValue={currentPh}
+                    burnerPower={burnerPower}
+                    isStirring={isStirring}
+                    isThermometerActive={isThermometerActive}
+                    precipitateG={content.precipitateG}
+                    effervescenceBubbles={effervescenceBubbles}
+                    isConductivityActive={isConductivityActive}
+                    conductivityGlow={conductivityGlow}
+                    flameTestMetal={flameTestMetal}
+                    isEthanolBurning={isEthanolBurning}
+                    displayedWeightG={displayedWeightG}
+                    litmusStripDipped={litmusStripDipped}
+                    hydrogenGasMl={content.hydrogenGasMl}
+                    dispenseTrigger={dispenseAnimCounter}
+                    iceCount={content.iceCount}
+                    hasActiveMetal={content.sodiumG > 0 ? 'sodium' : content.potassiumG > 0 ? 'potassium' : 'none'}
+                    hasMagnesiumRibbon={content.magnesiumG > 0}
+                    precipitateType={
+                      content.silverNitrateMl > 0 && (content.acidMl > 0 || content.calciumChlorideG > 0)
+                        ? 'silver_chloride'
+                        : content.copperSulfateMl > 0 && (content.baseMl > 0 || content.ammoniaMl > 0)
+                        ? 'copper_hydroxide'
+                        : content.bariumG > 0 && content.copperSulfateMl > 0
+                        ? 'barium_sulfate'
+                        : content.ironG > 0
+                        ? 'iron'
+                        : 'none'
+                    }
+                  />
                 </div>
-              </div>
+              ) : (
+                <div className="relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border-2 border-slate-700/60 rounded-xl overflow-hidden shadow-2xl flex items-center justify-center touch-none">
+                  <canvas
+                    key="lab-canvas-2d-main"
+                    ref={canvasRef}
+                    width={460}
+                    height={345}
+                    className="w-full h-full relative z-10 cursor-grab active:cursor-grabbing select-none"
+                    onPointerDown={handleCanvasPointerDown}
+                    onPointerMove={handleCanvasPointerMove}
+                    onPointerUp={handleCanvasPointerUp}
+                    onPointerCancel={handleCanvasPointerUp}
+                  />
+                  {/* Action notification floating over beaker */}
+                  <div className="absolute top-2 left-2 right-2 z-20 pointer-events-none">
+                    <div className="bg-slate-900/90 border border-slate-800 backdrop-blur-md rounded-xl p-2 text-center text-xs font-semibold text-slate-300 shadow-md">
+                      {lastActionMessage}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User Stirring & Interaction Guidance Tip */}
+            <div className="w-full mt-2.5 px-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-[11px] text-cyan-300 flex items-center justify-between gap-2 shadow-inner">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>{t('💡 الخلط يتم بتحريك العصا الزجاجية: انقر زر "خلط بالعصا الزجاجية" أدناه أو اسحب العصا داخل الكأس مباشرة لمزج المحلول وتذويب الرواسب.', '💡 Mixing is done by moving the rod: click "Stir with Glass Rod" below or drag the rod inside the beaker to mix and dissolve solids.')}</span>
+              </span>
+              {isStirring && (
+                <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-bold animate-pulse">
+                  {t('جاري الخلط...', 'Stirring...')}
+                </span>
+              )}
             </div>
 
             {/* Tools Rack Controls under Beaker */}
-            <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mt-4">
+            <div className="w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mt-3">
               {/* Bunsen Burner Power Toggle */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] text-slate-400 font-bold block">{t('موقد بنزن:', 'Bunsen Burner:')}</span>
@@ -2220,19 +2602,101 @@ export const ExperimentalLab: React.FC = () => {
 
               {/* Glass Stirring Rod */}
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] text-slate-400 font-bold block">{t('ساق زجاجية:', 'Stirring Rod:')}</span>
+                <span className="text-[10px] text-slate-400 font-bold block">{t('عصا التحريك الزجاجية:', 'Stirring Rod:')}</span>
                 <button
                   onClick={handleStir}
                   disabled={isStirring || totalVolumeMl <= 0}
                   className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     isStirring
-                      ? 'bg-cyan-600 text-white shadow-md'
+                      ? 'bg-cyan-600 border-cyan-400 text-white shadow-md shadow-cyan-500/30 animate-pulse'
+                      : isDark ? 'bg-slate-950 border-slate-800 text-cyan-300 hover:bg-slate-900' : 'bg-slate-100 border-slate-200 text-cyan-800 hover:bg-slate-200'
+                  }`}
+                  title={t('تحريك وخلط المحلول بالعصا الزجاجية بحركة دائرية لتسريع التفاعل والذوبان (يمكنك أيضاً السحب بالماوس مباشرة داخل الكأس)', 'Stir solution in circular motion with glass rod (you can also drag directly in beaker)')}
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isStirring ? 'animate-spin' : ''}`} />
+                  <span>{isStirring ? t('جاري الخلط بالعصا...', 'Stirring with Rod...') : t('خلط بالعصا الزجاجية', 'Stir with Rod')}</span>
+                </button>
+              </div>
+
+              {/* Electrical Conductivity Tester */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-slate-400 font-bold block">{t('التوصيل الكهربائي:', 'Conductivity Probe:')}</span>
+                <button
+                  onClick={() => {
+                    setIsConductivityActive(!isConductivityActive);
+                    setLastActionMessage(
+                      !isConductivityActive
+                        ? t('تم غمس مسبار التوصيل الكهربائي في المحلول لمعاينة توهج المصباح وتفكك الأيونات.', 'Immersed conductivity probe to evaluate electrolyte ion dissociation.')
+                        : t('تم رفع مسبار التوصيل الكهربائي.', 'Removed conductivity probe.')
+                    );
+                  }}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    isConductivityActive
+                      ? 'bg-yellow-600 border-yellow-400 text-white shadow-md shadow-yellow-500/30'
                       : isDark ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
                   }`}
                 >
-                  <Sparkles className={`w-3.5 h-3.5 ${isStirring ? 'animate-spin' : ''}`} />
-                  <span>{isStirring ? t('تحريك...', 'Stirring...') : t('تحريك الكأس', 'Stir Beaker')}</span>
+                  <Zap className={`w-3.5 h-3.5 ${isConductivityActive && conductivityGlow > 0 ? 'text-yellow-300 animate-pulse' : ''}`} />
+                  <span>{isConductivityActive ? t('المسبار نشط ⚡', 'Probe Active ⚡') : t('فحص التوصيل', 'Test Conductivity')}</span>
                 </button>
+              </div>
+
+              {/* Flame Emission Test Wire Loop */}
+              <div className="flex flex-col gap-1 relative">
+                <span className="text-[10px] text-slate-400 font-bold block">{t('اختبار اللهب الطيفي:', 'Flame Test Loop:')}</span>
+                <button
+                  onClick={() => setIsFlameTestSelectorOpen(!isFlameTestSelectorOpen)}
+                  className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    flameTestMetal !== 'none'
+                      ? 'bg-purple-600 border-purple-400 text-white shadow-md'
+                      : isDark ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <Flame className="w-3.5 h-3.5 text-purple-300" />
+                  <span>{flameTestMetal !== 'none' ? `${flameTestMetal}` : t('سلك البلاتين', 'Flame Loop')}</span>
+                </button>
+
+                {isFlameTestSelectorOpen && (
+                  <div className="absolute bottom-full mb-2 left-0 w-64 bg-slate-900 border border-slate-700 rounded-xl p-2.5 shadow-2xl z-30 space-y-1.5 text-xs">
+                    <span className="font-bold text-[11px] text-slate-300 block pb-1 border-b border-slate-800">
+                      {t('اختر فلزاً لغمسه في سلك البلاتين وتقريبه من اللهب:', 'Pick metal salt to test emission color:')}
+                    </span>
+                    <div className="grid grid-cols-2 gap-1 text-[10px] font-bold">
+                      {[
+                        { id: 'copper', label: 'نحاس (أخضر زمردي)', en: 'Copper (Green)', color: '#10b981' },
+                        { id: 'sodium', label: 'صوديوم (أصفر ذهبي)', en: 'Sodium (Yellow)', color: '#f59e0b' },
+                        { id: 'potassium', label: 'بوتاسيوم (بنفسجي)', en: 'Potassium (Lilac)', color: '#a855f7' },
+                        { id: 'calcium', label: 'كالسيوم (برتقالي)', en: 'Calcium (Brick Red)', color: '#ea580c' },
+                        { id: 'strontium', label: 'سترونشيوم (قرمزي)', en: 'Strontium (Crimson)', color: '#e11d48' },
+                        { id: 'barium', label: 'باريوم (أخضر تفاحي)', en: 'Barium (Apple Green)', color: '#84cc16' }
+                      ].map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => {
+                            setFlameTestMetal(m.id);
+                            if (burnerPower === 'off') setBurnerPower('med');
+                            setIsFlameTestSelectorOpen(false);
+                            setLastActionMessage(t(`تم غمس سلك البلاتين في ${m.label}. لاحظ تغير لون اللهب الطيفي!`, `Dipped wire in ${m.en}. Observe spectral emission flame!`));
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-slate-600 flex items-center gap-1.5 transition-all text-right"
+                          style={{ color: m.color }}
+                        >
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                          <span className="truncate">{lang === 'ar' ? m.label : m.en}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        setFlameTestMetal('none');
+                        setIsFlameTestSelectorOpen(false);
+                      }}
+                      className="w-full py-1 text-center text-slate-400 hover:text-white text-[10px] bg-slate-800 rounded mt-1 font-bold"
+                    >
+                      {t('تنظيف سلك البلاتين (إيقاف)', 'Clean Loop (Off)')}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Litmus Paper Test Strip */}

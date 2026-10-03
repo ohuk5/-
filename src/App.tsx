@@ -49,18 +49,18 @@ function MainAppContent() {
       <main className="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 md:p-6 overflow-x-hidden">
         <div className="w-full flex flex-col md:flex-row gap-4 sm:gap-6 overflow-x-hidden">
           <div className="w-full flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden">
-            {activeTab === 'atom-builder' && (
+            <div className={activeTab === 'atom-builder' ? 'block w-full' : 'hidden'}>
               <AtomBuilder onOpenGuide={() => handleOpenGuide('atoms')} />
-            )}
-            {activeTab === 'states-of-matter' && (
+            </div>
+            <div className={activeTab === 'states-of-matter' ? 'block w-full' : 'hidden'}>
               <StatesOfMatter onOpenGuide={(cat) => handleOpenGuide(cat || 'states')} />
-            )}
-            {activeTab === 'radioactive-decay' && (
+            </div>
+            <div className={activeTab === 'radioactive-decay' ? 'block w-full' : 'hidden'}>
               <RadioactiveDecay onOpenGuide={() => handleOpenGuide('decay')} />
-            )}
-            {activeTab === 'experiments-lab' && (
+            </div>
+            <div className={activeTab === 'experiments-lab' ? 'block w-full' : 'hidden'}>
               <ExperimentalLab />
-            )}
+            </div>
           </div>
         </div>
       </main>
