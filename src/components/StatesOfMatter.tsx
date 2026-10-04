@@ -33,6 +33,7 @@ import {
 } from '../data/substancesData';
 import { useApp } from '../context/AppContext';
 import { StatesOfMatter3D } from './StatesOfMatter3D';
+import { playLabSound } from '../utils/soundEffects';
 
 interface Particle {
   x: number;
@@ -282,6 +283,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
       prevPhaseRef.current = currentPhase;
 
       if (substance.isSublimating && pressureAtm < 5.1 && (currentPhase === 'gas' || currentPhase === 'melting')) {
+        playLabSound('sizzle');
         setTransitionNotification({
           title: t('✨ حدوث التسامي المباشر (Sublimation)!', '✨ Direct Sublimation Occurring!'),
           description: t(
@@ -294,6 +296,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         (prevPhase === 'solid' && (currentPhase === 'melting' || currentPhase === 'liquid')) ||
         (prevPhase === 'melting' && currentPhase === 'liquid')
       ) {
+        playLabSound('pour');
         setTransitionNotification({
           title: t('🔥 حدوث الانصهار (Melting)!', '🔥 Melting Occurring!'),
           description: t(
@@ -306,6 +309,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         (prevPhase === 'liquid' && (currentPhase === 'boiling' || currentPhase === 'gas')) ||
         (prevPhase === 'boiling' && currentPhase === 'gas')
       ) {
+        playLabSound('fizz');
         setTransitionNotification({
           title: t('💨 حدوث التبخر والغليان (Boiling)!', '💨 Boiling & Vaporization!'),
           description: t(
@@ -318,6 +322,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         (prevPhase === 'gas' && (currentPhase === 'boiling' || currentPhase === 'liquid')) ||
         (prevPhase === 'boiling' && currentPhase === 'liquid')
       ) {
+        playLabSound('drop');
         const isPressureTriggered = volumeLidPercent < 55 && pressureAtm > 1.8;
         setTransitionNotification({
           title: isPressureTriggered
@@ -338,6 +343,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         (prevPhase === 'liquid' && (currentPhase === 'melting' || currentPhase === 'solid')) ||
         (prevPhase === 'melting' && currentPhase === 'solid')
       ) {
+        playLabSound('ice');
         setTransitionNotification({
           title: t('❄️ حدوث التجمد والتصلب (Solidification)!', '❄️ Freezing & Solidification!'),
           description: t(
@@ -437,6 +443,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
 
   // UNRESTRICTED BURNER: Heating goes all the way up to maxScaleK (up to 4400K+ for Iron and Gold!)
   const startBurner = (type: 'heat' | 'cool') => {
+    playLabSound(type === 'heat' ? 'burner_on' : 'ice');
     setBurnerActive(type);
     if (burnerIntervalRef.current) clearInterval(burnerIntervalRef.current);
 
@@ -464,6 +471,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
 
   // Pressure Release Valve Venting
   const triggerVent = () => {
+    playLabSound('catalytic_eruption');
     setIsVenting(true);
     setTargetTemp(t => Math.max(5, t - 15));
     for (let i = 0; i < 20; i++) {
@@ -747,6 +755,29 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
 
       // Kinetic collisions reset
       momentumExchangeRef.current = 0;
+
+      // Draw 2D Intermolecular Crystal Lattice / Liquid Cohesion Bond Lines
+      if (currentP === 'solid' || currentP === 'melting' || currentP === 'liquid') {
+        const maxBondDist = currentP === 'solid' ? 42 : currentP === 'melting' ? 45 : 36;
+        ctx.save();
+        ctx.lineWidth = currentP === 'solid' ? 1.3 : 0.9;
+        for (let i = 0; i < n; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const dx = particles[j].x - particles[i].x;
+            const dy = particles[j].y - particles[i].y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < maxBondDist) {
+              const alpha = (1 - d / maxBondDist) * (currentP === 'solid' ? 0.48 : currentP === 'melting' ? 0.32 : 0.22);
+              ctx.strokeStyle = `rgba(56, 189, 248, ${alpha.toFixed(3)})`;
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.stroke();
+            }
+          }
+        }
+        ctx.restore();
+      }
 
       // RENDER MOLECULES & ATOMS (Supporting all 12 substances including Gold and Bromine!)
       particles.forEach(p => {
@@ -1069,7 +1100,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs font-bold no-scrollbar flex-1">
           <button
             onClick={() => runExperiment('space_drop')}
-            className="px-3 py-1.5 rounded-xl bg-purple-950/70 hover:bg-purple-900/80 border border-purple-600/50 text-purple-200 transition-all whitespace-nowrap flex items-center gap-1"
+            className="px-3 py-1.5 rounded-xl bg-sky-950/70 hover:bg-sky-900/80 border border-sky-600/50 text-sky-200 transition-all whitespace-nowrap flex items-center gap-1"
           >
             <span>🚀</span>
             <span>{t('كرة الماء بالفضاء', 'Zero-G Water Drop')}</span>
@@ -1129,7 +1160,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
 
       <div className="w-full flex flex-col md:flex-row gap-5 items-start overflow-x-hidden">
         {/* Left Column: Substance Selection & Physics Controls */}
-        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
+        <div className="w-full md:w-[300px] lg:w-[330px] xl:w-[340px] shrink-0 min-w-0 flex flex-col gap-4 order-2 md:order-1">
           {/* Substance Selector Card (Expanded to 12 substances including Gold & Bromine!) */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
@@ -1247,7 +1278,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                 onClick={() => handleSetGravityPreset('zero')}
                 className={`py-2 px-1.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
                   gravityPreset === 'zero'
-                    ? 'bg-purple-950 border-purple-500 text-purple-300 font-bold shadow-sm ring-1 ring-purple-400'
+                    ? 'bg-cyan-950 border-cyan-500 text-cyan-300 font-bold shadow-sm ring-1 ring-cyan-400'
                     : isDark ? 'bg-slate-950/50 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600'
                 }`}
               >
@@ -1318,40 +1349,46 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         </div>
 
         {/* Main Simulation Stage & Thermal Controls */}
-        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+        <div className="w-full flex-1 min-w-0 flex flex-col xl:flex-row gap-5 order-1 md:order-2">
           {/* Middle Column: Physical Simulation Vessel & Correct Phase Gauge */}
-          <div className="w-full lg:flex-1 flex flex-col items-center gap-4">
-          <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center ${
+          <div className="w-full xl:flex-1 min-w-0 flex flex-col items-center gap-4">
+          <div className={`w-full min-w-0 p-4 rounded-2xl border shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
             {/* Top Toolbar: View Mode Switcher, Phase Badge & Manometer */}
             <div className="w-full flex flex-wrap items-center justify-between gap-2.5 mb-3 px-1">
-              {/* View Mode Switcher (3D أو 2D فقط) */}
-              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950/80 border border-slate-800 shadow-inner">
+              {/* View Mode Switcher (Unified Cyan Design matching AtomBuilder!) */}
+              <div className="flex items-center gap-1 p-1 bg-slate-950/80 border border-slate-800 rounded-xl shadow-inner">
                 <button
                   type="button"
-                  onClick={() => setViewMode('3d')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  onClick={() => {
+                    playLabSound('click');
+                    setViewMode('3d');
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     viewMode === '3d'
-                      ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                   title={t('حجرة ثلاثية الأبعاد 3D', '3D Chamber View')}
                 >
-                  <Box className="w-3.5 h-3.5 text-purple-300" />
-                  <span>{t('ثلاثي الأبعاد 3D', '3D View')}</span>
+                  <Box className="w-3.5 h-3.5 text-cyan-300" />
+                  <span>{t('مجسم 3D', '3D Model')}</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode('2d')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                  onClick={() => {
+                    playLabSound('click');
+                    setViewMode('2d');
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     viewMode === '2d'
-                      ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                   title={t('مخطط ثنائي الأبعاد 2D', '2D Canvas View')}
                 >
-                  <span>2D {t('ثنائي الأبعاد', '2D')}</span>
+                  <span>{t('مخطط 2D', '2D View')}</span>
                 </button>
               </div>
 
@@ -1383,7 +1420,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
             {/* Viewport Rendering Area (3D or 2D) */}
             <div className="w-full flex flex-col items-center justify-center animate-fadeIn">
               {viewMode === '3d' ? (
-                <div className="w-full aspect-[4/3] max-w-[460px] rounded-xl overflow-hidden shadow-2xl border-2 border-slate-700/60 bg-slate-950">
+                <div className="w-full aspect-[4/3] max-w-[460px] rounded-xl overflow-hidden shadow-inner border border-slate-800 bg-slate-950">
                   <StatesOfMatter3D
                     key={`som-3d-${substance.id}`}
                     substance={substance}
@@ -1398,7 +1435,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                   />
                 </div>
               ) : (
-                <div className="relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border-2 border-slate-700/60 rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
+                <div className="relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
                   <canvas
                     key="som-canvas-2d"
                     ref={canvasRef}
@@ -1503,7 +1540,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                   type="button"
                   onClick={() => setPressurePreset('vacuum')}
                   className={`py-1 px-1.5 rounded-lg border text-[11px] font-bold transition-all text-center ${
-                    volumeLidPercent > 85 ? 'bg-purple-950/80 border-purple-600 text-purple-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
+                    volumeLidPercent > 85 ? 'bg-sky-950/80 border-sky-600 text-sky-300' : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   {t('تفريغ 100%', 'Vacuum 100%')}
@@ -1611,11 +1648,39 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
               </span>
               <span className="text-amber-400">{maxScaleK} K ({t('غاز', 'Gas')})</span>
             </div>
+
+            {/* Live Kinetic Theory & Molecular Velocity Telemetry */}
+            <div className={`grid grid-cols-3 gap-2 pt-2 border-t text-center ${
+              isDark ? 'border-slate-800' : 'border-slate-200'
+            }`}>
+              <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                <span className="text-[10px] text-slate-400 block">{t('متوسط سرعة الجزيئات (v_rms)', 'RMS Molecular Speed')}</span>
+                <span className="text-xs sm:text-sm font-mono font-extrabold text-cyan-400">
+                  {Math.round(Math.sqrt((3 * 8.314 * Math.max(1, actualTemp)) / (substance.mass * 0.001)))} m/s
+                </span>
+              </div>
+              <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                <span className="text-[10px] text-slate-400 block">{t('الطاقة الحركية المولية (E_k)', 'Molar Kinetic Energy')}</span>
+                <span className="text-xs sm:text-sm font-mono font-extrabold text-orange-400">
+                  {((1.5 * 8.314 * actualTemp) / 1000).toFixed(2)} kJ/mol
+                </span>
+              </div>
+              <div className={`p-2 rounded-xl border ${isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                <span className="text-[10px] text-slate-400 block">{t('الروابط الجزيئية', 'Intermolecular Bonds')}</span>
+                <span className="text-xs font-bold text-emerald-400">
+                  {phaseInfo.phase === 'solid'
+                    ? t('شبكة بلورية مترابطة', 'Rigid Crystal Lattice')
+                    : phaseInfo.phase === 'liquid' || phaseInfo.phase === 'melting'
+                    ? t('قوى تماسك انسيابية', 'Cohesive Fluid Bonds')
+                    : t('تصادمات مرنة حرة', 'Free Elastic Collisions')}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
           {/* Right Column: Thermal & Pressure Controls + Gauges */}
-          <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
+          <div className="w-full xl:w-[310px] shrink-0 min-w-0 flex flex-col gap-4">
           {/* Direct Temperature Input & Thermal Controls Card */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
@@ -1879,26 +1944,6 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                   <span className="block text-[11px]">🚨 {t('كبس فائق', 'Extreme')}</span>
                   <span className="text-[10px] font-mono text-red-400">&gt;6.0 Atm ({t('تنفيس أمان', 'Vent')})</span>
                 </button>
-              </div>
-            </div>
-
-            {/* Container Volume Lid Slider (Boyle's Law & Adiabatic Compression) */}
-            <div className="space-y-1.5 pt-2 border-t border-slate-800">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-400 font-semibold">{t('حجم الوعاء وكبس المكبس (V):', 'Piston Volume (V):')}</span>
-                <span className="font-mono font-bold text-cyan-400">{volumeLidPercent}%</span>
-              </div>
-              <input
-                type="range"
-                min="20"
-                max="100"
-                value={volumeLidPercent}
-                onChange={(e) => applyAdiabaticVolumeChange(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                <span>{t('كبس أقصى (20%)', 'Max Compression (20%)')}</span>
-                <span>{t('حجم كامل (100%)', 'Full Volume (100%)')}</span>
               </div>
             </div>
           </div>

@@ -4,15 +4,13 @@ import {
   RotateCcw,
   ZoomIn,
   ZoomOut,
-  Flame,
-  Snowflake,
   Compass,
   Maximize2,
-  Minimize2,
-  Wind
+  Minimize2
 } from 'lucide-react';
 import { SubstanceInfo, MatterPhase } from '../data/substancesData';
 import { useApp } from '../context/AppContext';
+import { playLabSound } from '../utils/soundEffects';
 
 export interface StatesOfMatter3DProps {
   substance: SubstanceInfo;
@@ -34,6 +32,7 @@ interface Particle3D {
   vx: number;
   vy: number;
   vz: number;
+  radius: number;
   targetLatticeX: number;
   targetLatticeY: number;
   targetLatticeZ: number;
@@ -94,6 +93,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
 
   // References for live 3D updates
   const pistonGroupRef = useRef<THREE.Group | null>(null);
+  const prevPistonYRef = useRef<number>(10.0);
   const particles3DRef = useRef<Particle3D[]>([]);
   const particlesGroupRef = useRef<THREE.Group | null>(null);
   const gaugeNeedleRef = useRef<THREE.Mesh | null>(null);
@@ -101,6 +101,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
   const burnerFlameLightRef = useRef<THREE.PointLight | null>(null);
   const coolerFrostMeshRef = useRef<THREE.Mesh | null>(null);
   const coolerFrostLightRef = useRef<THREE.PointLight | null>(null);
+  const latticeLinesRef = useRef<THREE.LineSegments | null>(null);
 
   const chamberRadius = 7.0;
   const chamberHeight = 16.0;
@@ -115,7 +116,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
 
     const scene = new THREE.Scene();
     sceneRef.current = scene;
-    scene.background = new THREE.Color(0x060913);
+    scene.background = new THREE.Color(0x060a14);
 
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 1000);
     cameraRef.current = camera;
@@ -128,8 +129,11 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
     camera.lookAt(0, 5, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height, false);
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    renderer.domElement.style.display = 'block';
     renderer.shadowMap.enabled = true;
     rendererRef.current = renderer;
 
@@ -137,27 +141,27 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
     container.appendChild(renderer.domElement);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xf1f5f9, 0.85);
+    const ambientLight = new THREE.AmbientLight(0xf1f5f9, 0.9);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xe0f2fe, 1.3);
+    const dirLight = new THREE.DirectionalLight(0xe0f2fe, 1.35);
     dirLight.position.set(16, 26, 20);
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.6);
+    const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.65);
     rimLight.position.set(-18, 12, -15);
     scene.add(rimLight);
 
     // Laboratory Table Base
     const tableGeo = new THREE.CylinderGeometry(20, 20, 1.2, 48);
-    const tableMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.5, metalness: 0.2 });
+    const tableMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.45, metalness: 0.25 });
     const table = new THREE.Mesh(tableGeo, tableMat);
     table.position.y = -4.6;
     table.receiveShadow = true;
     scene.add(table);
 
-    const grid = new THREE.GridHelper(32, 16, 0x38bdf8, 0x1e293b);
+    const grid = new THREE.GridHelper(32, 16, 0x06b6d4, 0x1e293b);
     grid.position.y = -3.95;
     scene.add(grid);
 
@@ -174,10 +178,10 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
 
     // Thick Glass Cylinder Body
     const glassMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
+      color: 0xe0f2fe,
       transparent: true,
-      opacity: 0.20,
-      roughness: 0.06,
+      opacity: 0.18,
+      roughness: 0.05,
       metalness: 0.05,
       clearcoat: 1.0,
       clearcoatRoughness: 0.05,
@@ -192,7 +196,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
 
     // Bottom Interior Floor
     const floorGeo = new THREE.CylinderGeometry(chamberRadius * 0.98, chamberRadius * 0.98, 0.4, 36);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, metalness: 0.3 });
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
     floorMesh.position.y = 1.0;
     chamberGroup.add(floorMesh);
@@ -207,12 +211,12 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
 
     // Height Ticks on Chamber Wall
     const ticksGroup = new THREE.Group();
-    for (let t = 1; t <= 4; t++) {
-      const tickY = 1.0 + (t / 4) * (chamberHeight - 2.0);
+    for (let tIdx = 1; tIdx <= 4; tIdx++) {
+      const tickY = 1.0 + (tIdx / 4) * (chamberHeight - 2.0);
       const tickGeo = new THREE.TorusGeometry(chamberRadius + 0.05, 0.04, 6, 24, Math.PI / 4);
       tickGeo.rotateX(Math.PI / 2);
       tickGeo.rotateY(Math.PI / 4);
-      const tickMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.6 });
+      const tickMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.65 });
       const tickMesh = new THREE.Mesh(tickGeo, tickMat);
       tickMesh.position.y = tickY;
       ticksGroup.add(tickMesh);
@@ -223,6 +227,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
     const pistonGroup = new THREE.Group();
     const pistonLidY = 2.0 + (volumeLidPercent / 100) * (chamberHeight - 3.5);
     pistonGroup.position.set(0, pistonLidY, 0);
+    prevPistonYRef.current = pistonLidY;
 
     // Piston Disc Plate
     const pDiscGeo = new THREE.CylinderGeometry(chamberRadius * 0.96, chamberRadius * 0.96, 0.7, 36);
@@ -233,7 +238,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
     // Piston Rubber Gasket Ring
     const gasketGeo = new THREE.TorusGeometry(chamberRadius * 0.95, 0.18, 12, 36);
     gasketGeo.rotateX(Math.PI / 2);
-    const gasketMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.9 });
+    const gasketMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.4, metalness: 0.3 });
     const gasket = new THREE.Mesh(gasketGeo, gasketMat);
     pistonGroup.add(gasket);
 
@@ -331,75 +336,141 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
     chamberGroup.add(particlesGroup);
     particlesGroupRef.current = particlesGroup;
 
+    // 3D Intermolecular Bond Lines (Crystal Lattice / Liquid Cohesion Visualizer)
+    const maxBondSegments = 300;
+    const bondPositions = new Float32Array(maxBondSegments * 6);
+    const bondGeo = new THREE.BufferGeometry();
+    bondGeo.setAttribute('position', new THREE.BufferAttribute(bondPositions, 3));
+    const bondMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending
+    });
+    const latticeLines = new THREE.LineSegments(bondGeo, bondMat);
+    latticeLines.frustumCulled = false;
+    chamberGroup.add(latticeLines);
+    latticeLinesRef.current = latticeLines;
+
     scene.add(chamberGroup);
 
-    // Helper to generate a single 3D molecule / atom mesh
-    const createSubstanceMesh = (): THREE.Object3D => {
-      if (substance.id === 'water') {
-        // H2O Molecule: Oxygen sphere (red) + 2 Hydrogen spheres (white)
-        const mol = new THREE.Group();
+    // Helper to generate accurate 3D molecule / atom mesh for all 12 substances
+    const createSubstanceMesh = (): { mesh: THREE.Object3D; radius: number } => {
+      const subColor = new THREE.Color(substance.color || '#38bdf8');
+      const bondCylMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.3, metalness: 0.4 });
 
-        const oxyGeo = new THREE.SphereGeometry(0.48, 16, 16);
-        const oxyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.25 });
-        const oxygen = new THREE.Mesh(oxyGeo, oxyMat);
-        mol.add(oxygen);
+      if (substance.particleType === 'water') {
+        // H2O Molecule: Oxygen sphere (red) + 2 Hydrogen spheres (white) at 104.5°
+        const mol = new THREE.Group();
+        const oxyGeo = new THREE.SphereGeometry(0.46, 16, 16);
+        const oxyMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.22, metalness: 0.1 });
+        mol.add(new THREE.Mesh(oxyGeo, oxyMat));
 
         const hydGeo = new THREE.SphereGeometry(0.28, 12, 12);
         const hydMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
-
         const bondAngle = (104.5 * Math.PI) / 180;
         const bondDist = 0.58;
 
-        const hyd1 = new THREE.Mesh(hydGeo, hydMat);
-        hyd1.position.set(Math.sin(bondAngle / 2) * bondDist, -Math.cos(bondAngle / 2) * bondDist, 0);
-        mol.add(hyd1);
+        [-1, 1].forEach(dir => {
+          const hx = Math.sin((bondAngle / 2) * dir) * bondDist;
+          const hy = -Math.cos(bondAngle / 2) * bondDist;
+          const hyd = new THREE.Mesh(hydGeo, hydMat);
+          hyd.position.set(hx, hy, 0);
+          mol.add(hyd);
 
-        const hyd2 = new THREE.Mesh(hydGeo, hydMat);
-        hyd2.position.set(-Math.sin(bondAngle / 2) * bondDist, -Math.cos(bondAngle / 2) * bondDist, 0);
-        mol.add(hyd2);
+          const cylGeo = new THREE.CylinderGeometry(0.08, 0.08, bondDist, 8);
+          const cyl = new THREE.Mesh(cylGeo, bondCylMat);
+          cyl.position.set(hx * 0.5, hy * 0.5, 0);
+          cyl.rotation.z = (bondAngle / 2) * dir;
+          mol.add(cyl);
+        });
 
-        return mol;
-      } else if (substance.id === 'iron') {
-        const geo = new THREE.SphereGeometry(0.48, 16, 16);
-        const mat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9, roughness: 0.2 });
-        return new THREE.Mesh(geo, mat);
-      } else if (substance.id === 'gold') {
-        const geo = new THREE.SphereGeometry(0.48, 16, 16);
-        const mat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.15 });
-        return new THREE.Mesh(geo, mat);
-      } else if (substance.id === 'oxygen') {
-        // O2 Molecule: 2 connected red spheres
-        const mol = new THREE.Group();
-        const oGeo = new THREE.SphereGeometry(0.42, 14, 14);
-        const oMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
-        const o1 = new THREE.Mesh(oGeo, oMat);
-        o1.position.x = 0.35;
-        mol.add(o1);
-        const o2 = new THREE.Mesh(oGeo, oMat);
-        o2.position.x = -0.35;
-        mol.add(o2);
-        return mol;
-      } else if (substance.id === 'co2') {
-        // CO2 Molecule: Carbon (black) in center + 2 Oxygens (red)
+        return { mesh: mol, radius: 0.65 };
+      } else if (substance.particleType === 'co2') {
+        // CO2 Linear Molecule: O=C=O
         const mol = new THREE.Group();
         const cGeo = new THREE.SphereGeometry(0.38, 14, 14);
-        const cMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
-        const c = new THREE.Mesh(cGeo, cMat);
-        mol.add(c);
-        const oGeo = new THREE.SphereGeometry(0.42, 14, 14);
-        const oMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+        const cMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.35, metalness: 0.2 });
+        mol.add(new THREE.Mesh(cGeo, cMat));
+
+        const bGeo = new THREE.CylinderGeometry(0.11, 0.11, 1.28, 8);
+        bGeo.rotateZ(Math.PI / 2);
+        mol.add(new THREE.Mesh(bGeo, bondCylMat));
+
+        const oGeo = new THREE.SphereGeometry(0.4, 14, 14);
+        const oMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.25 });
         const o1 = new THREE.Mesh(oGeo, oMat);
-        o1.position.x = 0.65;
+        o1.position.x = 0.64;
         mol.add(o1);
         const o2 = new THREE.Mesh(oGeo, oMat);
-        o2.position.x = -0.65;
+        o2.position.x = -0.64;
         mol.add(o2);
-        return mol;
+
+        return { mesh: mol, radius: 0.72 };
+      } else if (substance.particleType === 'methane') {
+        // CH4 or Ethanol 3D Tetrahedral / Organic Molecule
+        const mol = new THREE.Group();
+        const cGeo = new THREE.SphereGeometry(0.42, 14, 14);
+        const cMat = new THREE.MeshStandardMaterial({ color: subColor, roughness: 0.3, metalness: 0.15 });
+        mol.add(new THREE.Mesh(cGeo, cMat));
+
+        const hGeo = new THREE.SphereGeometry(0.24, 10, 10);
+        const hMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
+        const verts = [
+          new THREE.Vector3(1, 1, 1).normalize().multiplyScalar(0.56),
+          new THREE.Vector3(-1, -1, 1).normalize().multiplyScalar(0.56),
+          new THREE.Vector3(-1, 1, -1).normalize().multiplyScalar(0.56),
+          new THREE.Vector3(1, -1, -1).normalize().multiplyScalar(0.56)
+        ];
+        verts.forEach((v, idx) => {
+          const hMesh = new THREE.Mesh(
+            hGeo,
+            substance.id === 'ethanol' && idx === 0
+              ? new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.25 })
+              : hMat
+          );
+          hMesh.position.copy(v);
+          mol.add(hMesh);
+        });
+        return { mesh: mol, radius: 0.66 };
+      } else if (substance.particleType === 'diatomic') {
+        // O2, N2, Br2 Diatomic Dumbbell with bond cylinder
+        const mol = new THREE.Group();
+        const aGeo = new THREE.SphereGeometry(0.38, 14, 14);
+        const aMat = new THREE.MeshStandardMaterial({ color: subColor, roughness: 0.25, metalness: 0.15 });
+        const a1 = new THREE.Mesh(aGeo, aMat);
+        a1.position.x = 0.34;
+        mol.add(a1);
+        const a2 = new THREE.Mesh(aGeo, aMat);
+        a2.position.x = -0.34;
+        mol.add(a2);
+
+        const bGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.68, 8);
+        bGeo.rotateZ(Math.PI / 2);
+        mol.add(new THREE.Mesh(bGeo, bondCylMat));
+        return { mesh: mol, radius: 0.62 };
+      } else if (substance.particleType === 'metallic') {
+        // Metallic Sphere (Hg, Fe, Au, Ga, Ti)
+        const geo = new THREE.SphereGeometry(0.48, 18, 18);
+        const mat = new THREE.MeshStandardMaterial({
+          color: subColor,
+          metalness: 0.92,
+          roughness: 0.16,
+          emissive: new THREE.Color(0x000000),
+          emissiveIntensity: 0
+        });
+        return { mesh: new THREE.Mesh(geo, mat), radius: 0.52 };
       } else {
-        // Default elemental sphere
-        const geo = new THREE.SphereGeometry(0.46, 16, 16);
-        const mat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.3 });
-        return new THREE.Mesh(geo, mat);
+        // Monatomic Noble Gas (He, Ne, Ar, Xe)
+        const geo = new THREE.SphereGeometry(0.45, 16, 16);
+        const mat = new THREE.MeshStandardMaterial({
+          color: subColor,
+          roughness: 0.22,
+          metalness: 0.1,
+          emissive: subColor,
+          emissiveIntensity: 0.18
+        });
+        return { mesh: new THREE.Mesh(geo, mat), radius: 0.5 };
       }
     };
 
@@ -412,10 +483,10 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
     const latticeLayers = 3;
     const particlesPerLayer = Math.ceil(count / latticeLayers);
     const side = Math.ceil(Math.sqrt(particlesPerLayer));
-    const spacing = 1.35;
+    const spacing = 1.32;
 
     for (let i = 0; i < count; i++) {
-      const mesh = createSubstanceMesh();
+      const { mesh, radius: pRadius } = createSubstanceMesh();
       mesh.renderOrder = 1;
       particlesGroup.add(mesh);
 
@@ -424,12 +495,12 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
       const row = Math.floor((i % (side * side)) / side);
 
       const targetLx = (col - (side - 1) / 2) * spacing;
-      const targetLy = floorY + layer * (spacing * 0.9) + 0.5;
+      const targetLy = floorY + layer * (spacing * 0.92) + 0.5;
       const targetLz = (row - (side - 1) / 2) * spacing;
 
-      const initX = targetLx + (Math.random() - 0.5) * 0.2;
+      const initX = targetLx + (Math.random() - 0.5) * 0.15;
       const initY = targetLy;
-      const initZ = targetLz + (Math.random() - 0.5) * 0.2;
+      const initZ = targetLz + (Math.random() - 0.5) * 0.15;
 
       mesh.position.set(initX, initY, initZ);
 
@@ -438,24 +509,25 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         x: initX,
         y: initY,
         z: initZ,
-        vx: (Math.random() - 0.5) * 0.1,
-        vy: (Math.random() - 0.5) * 0.1,
-        vz: (Math.random() - 0.5) * 0.1,
+        vx: (Math.random() - 0.5) * 0.12,
+        vy: (Math.random() - 0.5) * 0.12,
+        vz: (Math.random() - 0.5) * 0.12,
+        radius: pRadius,
         targetLatticeX: targetLx,
         targetLatticeY: targetLy,
         targetLatticeZ: targetLz,
         rotX: Math.random() * Math.PI,
         rotY: Math.random() * Math.PI,
         rotZ: Math.random() * Math.PI,
-        vRotX: (Math.random() - 0.5) * 0.05,
-        vRotY: (Math.random() - 0.5) * 0.05,
-        vRotZ: (Math.random() - 0.5) * 0.05
+        vRotX: (Math.random() - 0.5) * 0.04,
+        vRotY: (Math.random() - 0.5) * 0.04,
+        vRotZ: (Math.random() - 0.5) * 0.04
       });
     }
 
     particles3DRef.current = newParticles;
 
-    // Animation Loop
+    // Animation & 3D Physics Loop
     let time = 0;
     const animate = () => {
       time += 0.02;
@@ -483,143 +555,300 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         burnerActive: curBurner
       } = liveStateRef.current;
 
-      // Piston Lid Height Bound (inside chamber coordinates)
-      const currentPistonY = 2.0 + (curVol / 100) * (chamberHeight - 3.5);
+      // Piston Lid Height Bound & Smooth Velocity Transfer
+      const targetPistonY = 2.0 + (curVol / 100) * (chamberHeight - 3.5);
+      const currentPistonY = prevPistonYRef.current + (targetPistonY - prevPistonYRef.current) * 0.25;
+      const pistonVelY = currentPistonY - prevPistonYRef.current;
+      prevPistonYRef.current = currentPistonY;
+
       if (pistonGroupRef.current) {
         pistonGroupRef.current.position.y = currentPistonY;
       }
 
       // Pressure Gauge Needle Angle
       if (gaugeNeedleRef.current) {
-        const needleAngle = -Math.min(Math.PI * 0.8, (curP / 6.0) * Math.PI * 0.8);
+        const needleAngle = -Math.min(Math.PI * 0.85, (curP / 6.0) * Math.PI * 0.85);
         gaugeNeedleRef.current.rotation.z = needleAngle;
       }
 
       // Flame / Frost Flicker
       if (burnerFlameMeshRef.current && curBurner === 'heat') {
-        const flicker = 1.0 + Math.sin(time * 30) * 0.1;
+        const flicker = 1.0 + Math.sin(time * 30) * 0.12;
         burnerFlameMeshRef.current.scale.set(flicker, flicker, flicker);
       }
 
-      // 3D Particles Motion Loop (Phase-dependent)
+      // 3D Particles Physics Update
       const particles = particles3DRef.current;
-      const speedScale = Math.sqrt(Math.max(5, curTemp) / 300) * 0.06;
-      const radiusBound = chamberRadius * 0.88;
+      const n = particles.length;
+      const speedScale = Math.sqrt(Math.max(5, curTemp) / 300) * 0.065;
+      const radiusBound = chamberRadius * 0.86;
       const bottomBound = 1.5;
-      const topBound = currentPistonY - 0.6;
+      const topBound = Math.max(bottomBound + 1.4, currentPistonY - 0.65);
 
-      for (let pIdx = 0; pIdx < particles.length; pIdx++) {
+      // Compute 3D Center of Mass for Zero-G Surface Tension Cohesion
+      let comX = 0;
+      let comY = 0;
+      let comZ = 0;
+      if (n > 0) {
+        for (let i = 0; i < n; i++) {
+          comX += particles[i].x;
+          comY += particles[i].y;
+          comZ += particles[i].z;
+        }
+        comX /= n;
+        comY /= n;
+        comZ /= n;
+      }
+      // In Zero-G, gently drift center of mass toward chamber center
+      const zeroGTargetY = (bottomBound + topBound) * 0.5;
+
+      // Blackbody incandescence for high-temperature metals (> 950 K)
+      const isHotMetal = substance.particleType === 'metallic' && curTemp > 950;
+      const glowFactor = isHotMetal ? Math.min(1, (curTemp - 950) / 2200) : 0;
+
+      for (let pIdx = 0; pIdx < n; pIdx++) {
         const p = particles[pIdx];
 
+        if (isHotMetal && p.mesh instanceof THREE.Mesh && p.mesh.material instanceof THREE.MeshStandardMaterial) {
+          p.mesh.material.emissive.setRGB(glowFactor, glowFactor * 0.42, glowFactor * 0.08);
+          p.mesh.material.emissiveIntensity = glowFactor * 1.4;
+        } else if (substance.particleType === 'metallic' && p.mesh instanceof THREE.Mesh && p.mesh.material instanceof THREE.MeshStandardMaterial) {
+          p.mesh.material.emissiveIntensity = 0;
+        }
+
         if (curPhase === 'solid') {
-          // Solid: Vibrates tightly around 3D crystal lattice positions
-          const jitter = speedScale * 0.18;
-          p.x = p.targetLatticeX + Math.sin(time * 20 + pIdx) * jitter;
-          p.y = p.targetLatticeY + Math.cos(time * 24 + pIdx) * jitter;
-          p.z = p.targetLatticeZ + Math.sin(time * 28 + pIdx * 1.5) * jitter;
+          // Solid: Spring-restoring force to 3D crystal lattice + thermal harmonic vibration
+          const jitter = speedScale * 0.22;
+          const targetYOffset = curGrav === 0 ? (zeroGTargetY - 2.6) : 0;
+          const tx = p.targetLatticeX + Math.sin(time * 22 + pIdx) * jitter;
+          const ty = p.targetLatticeY + targetYOffset + Math.cos(time * 25 + pIdx) * jitter;
+          const tz = p.targetLatticeZ + Math.sin(time * 28 + pIdx * 1.5) * jitter;
+
+          p.vx = (tx - p.x) * 0.28;
+          p.vy = (ty - p.y) * 0.28;
+          p.vz = (tz - p.z) * 0.28;
+          p.x += p.vx;
+          p.y += p.vy;
+          p.z += p.vz;
         } else if (curPhase === 'melting') {
-          // Melting: Lattice softens, starts sliding and flowing
+          // Melting: Lattice softens, gravity/cohesion takes over
           const jitter = speedScale * 0.35;
-          p.vx += (Math.random() - 0.5) * jitter - p.vx * 0.08;
-          p.vy -= curGrav * 0.04;
-          p.vz += (Math.random() - 0.5) * jitter - p.vz * 0.08;
+          p.vx += (p.targetLatticeX - p.x) * 0.03 + (Math.random() - 0.5) * jitter;
+          p.vy += (Math.random() - 0.5) * jitter - curGrav * 0.032;
+          p.vz += (p.targetLatticeZ - p.z) * 0.03 + (Math.random() - 0.5) * jitter;
+
+          p.vx *= 0.88;
+          p.vy *= 0.88;
+          p.vz *= 0.88;
 
           p.x += p.vx;
           p.y += p.vy;
           p.z += p.vz;
-
-          // Clamping to chamber bottom
-          const distXZ = Math.sqrt(p.x * p.x + p.z * p.z);
-          if (distXZ > radiusBound) {
-            const angle = Math.atan2(p.z, p.x);
-            p.x = Math.cos(angle) * radiusBound;
-            p.z = Math.sin(angle) * radiusBound;
-            p.vx *= -0.5;
-            p.vz *= -0.5;
-          }
-          if (p.y < bottomBound) {
-            p.y = bottomBound;
-            p.vy = Math.abs(p.vy) * 0.4;
-          }
         } else if (curPhase === 'liquid') {
-          // Liquid: Cohesive fluid flowing at bottom, surface meniscus
-          p.vy -= curGrav * 0.05; // gravity pulls down
-          p.vx += (Math.random() - 0.5) * speedScale * 0.25 - p.vx * 0.04;
-          p.vz += (Math.random() - 0.5) * speedScale * 0.25 - p.vz * 0.04;
+          // Liquid: Cohesive fluid dynamics + Zero-G spherical droplet formation!
+          if (curGrav > 0.01) {
+            p.vy -= curGrav * 0.038;
+            p.vx += (Math.random() - 0.5) * speedScale * 0.32;
+            p.vz += (Math.random() - 0.5) * speedScale * 0.32;
+          } else {
+            // ZERO-G 3D SPHERICAL DROPLET SURFACE TENSION
+            const dx = (comX * 0.5) - p.x;
+            const dy = (comY * 0.5 + zeroGTargetY * 0.5) - p.y;
+            const dz = (comZ * 0.5) - p.z;
+            const distToCenter = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
+            if (distToCenter > 1.2) {
+              p.vx += (dx / distToCenter) * 0.024;
+              p.vy += (dy / distToCenter) * 0.024;
+              p.vz += (dz / distToCenter) * 0.024;
+            }
+            p.vx += (Math.random() - 0.5) * speedScale * 0.18;
+            p.vy += (Math.random() - 0.5) * speedScale * 0.18;
+            p.vz += (Math.random() - 0.5) * speedScale * 0.18;
+          }
+
+          p.vx *= 0.94;
+          p.vy *= 0.94;
+          p.vz *= 0.94;
 
           p.x += p.vx;
           p.y += p.vy;
           p.z += p.vz;
-
-          // Cylindrical wall bounce
-          const distXZ = Math.sqrt(p.x * p.x + p.z * p.z);
-          if (distXZ > radiusBound) {
-            const angle = Math.atan2(p.z, p.x);
-            p.x = Math.cos(angle) * radiusBound;
-            p.z = Math.sin(angle) * radiusBound;
-            p.vx *= -0.6;
-            p.vz *= -0.6;
-          }
-
-          // Floor bounce
-          if (p.y < bottomBound) {
-            p.y = bottomBound;
-            p.vy = Math.abs(p.vy) * 0.3;
-          }
-
-          // Liquid surface level limit
-          const liquidMaxY = bottomBound + 3.8;
-          if (p.y > liquidMaxY) {
-            p.y = liquidMaxY;
-            p.vy *= -0.3;
-          }
         } else {
-          // Gas / Boiling: Free energetic 3D flight bouncing off all walls & piston!
-          p.vx += (Math.random() - 0.5) * 0.04;
-          p.vy += (Math.random() - 0.5) * 0.04 - curGrav * 0.015;
-          p.vz += (Math.random() - 0.5) * 0.04;
+          // Gas / Boiling: Energetic 3D Maxwell-Boltzmann flight + piston work
+          p.vx += (Math.random() - 0.5) * 0.035;
+          p.vy += (Math.random() - 0.5) * 0.035 - curGrav * 0.012 + (curPhase === 'boiling' ? 0.02 : 0);
+          p.vz += (Math.random() - 0.5) * 0.035;
 
-          // Normalize velocity to thermal speed
           const currentSpeed = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz) || 0.01;
-          const targetSpeed = speedScale * 2.8;
-          p.vx = (p.vx / currentSpeed) * targetSpeed;
-          p.vy = (p.vy / currentSpeed) * targetSpeed;
-          p.vz = (p.vz / currentSpeed) * targetSpeed;
+          const targetSpeed = Math.max(0.06, speedScale * 2.6);
+          const blend = 0.15;
+          const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * blend;
+          p.vx = (p.vx / currentSpeed) * newSpeed;
+          p.vy = (p.vy / currentSpeed) * newSpeed;
+          p.vz = (p.vz / currentSpeed) * newSpeed;
 
           p.x += p.vx;
           p.y += p.vy;
           p.z += p.vz;
+        }
 
-          // Cylinder wall bounce
-          const distXZ = Math.sqrt(p.x * p.x + p.z * p.z);
-          if (distXZ > radiusBound) {
-            const angle = Math.atan2(p.z, p.x);
-            p.x = Math.cos(angle) * radiusBound;
-            p.z = Math.sin(angle) * radiusBound;
-            p.vx *= -1;
-            p.vz *= -1;
-          }
-
-          // Floor bounce
-          if (p.y < bottomBound) {
-            p.y = bottomBound;
-            p.vy = Math.abs(p.vy);
-          }
-
-          // Piston Lid bounce
-          if (p.y > topBound) {
-            p.y = topBound;
-            p.vy = -Math.abs(p.vy);
+        // Cylindrical Chamber Wall Collisions
+        const distXZ = Math.sqrt(p.x * p.x + p.z * p.z);
+        const maxR = radiusBound - p.radius * 0.5;
+        if (distXZ > maxR && distXZ > 0.001) {
+          const nx = p.x / distXZ;
+          const nz = p.z / distXZ;
+          p.x = nx * maxR;
+          p.z = nz * maxR;
+          // Reflect velocity vector off cylindrical normal
+          const dot = p.vx * nx + p.vz * nz;
+          if (dot > 0) {
+            const restitution = curPhase === 'gas' || curPhase === 'boiling' ? 0.98 : 0.6;
+            p.vx -= (1 + restitution) * dot * nx;
+            p.vz -= (1 + restitution) * dot * nz;
           }
         }
 
-        // Apply 3D Rotation to Molecule
-        p.rotX += p.vRotX;
-        p.rotY += p.vRotY;
-        p.rotZ += p.vRotZ;
+        // Floor Collision
+        if (p.y < bottomBound) {
+          p.y = bottomBound;
+          p.vy = Math.abs(p.vy) * (curPhase === 'gas' || curPhase === 'boiling' ? 0.96 : 0.45);
+        }
+
+        // Liquid meniscus ceiling when under gravity
+        if (curPhase === 'liquid' && curGrav > 0.01) {
+          const liquidMaxY = Math.min(topBound, bottomBound + 4.2);
+          if (p.y > liquidMaxY) {
+            p.y = liquidMaxY;
+            p.vy = -Math.abs(p.vy) * 0.35;
+          }
+        }
+
+        // Movable Piston Lid Collision (with momentum transfer from moving piston!)
+        if (p.y > topBound) {
+          p.y = topBound;
+          p.vy = -Math.abs(p.vy) * 0.92 + Math.min(0, pistonVelY * 1.2);
+        }
+      }
+
+      // 3D Particle-to-Particle Elastic Collisions & Liquid Cohesion
+      for (let i = 0; i < n; i++) {
+        const p1 = particles[i];
+        for (let j = i + 1; j < n; j++) {
+          const p2 = particles[j];
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const dz = p2.z - p1.z;
+          const distSq = dx * dx + dy * dy + dz * dz;
+          const minDist = (p1.radius + p2.radius) * (curPhase === 'solid' ? 0.85 : 0.95);
+
+          if (distSq < minDist * minDist && distSq > 0.0001) {
+            const dist = Math.sqrt(distSq);
+            const overlap = (minDist - dist) * 0.5;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const nz = dz / dist;
+
+            if (curPhase !== 'solid') {
+              p1.x -= nx * overlap;
+              p1.y -= ny * overlap;
+              p1.z -= nz * overlap;
+              p2.x += nx * overlap;
+              p2.y += ny * overlap;
+              p2.z += nz * overlap;
+
+              const dvx = p1.vx - p2.vx;
+              const dvy = p1.vy - p2.vy;
+              const dvz = p1.vz - p2.vz;
+              const impulse = (dvx * nx + dvy * ny + dvz * nz) * 0.85;
+              if (impulse > 0) {
+                p1.vx -= impulse * nx;
+                p1.vy -= impulse * ny;
+                p1.vz -= impulse * nz;
+                p2.vx += impulse * nx;
+                p2.vy += impulse * ny;
+                p2.vz += impulse * nz;
+              }
+            }
+          } else if (curPhase === 'liquid' && distSq < 4.8 && distSq > minDist * minDist) {
+            // Short-range van der Waals / hydrogen-bond cohesion in liquid state
+            const dist = Math.sqrt(distSq);
+            const attract = 0.0022;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const nz = dz / dist;
+            p1.vx += nx * attract;
+            p1.vy += ny * attract;
+            p1.vz += nz * attract;
+            p2.vx -= nx * attract;
+            p2.vy -= ny * attract;
+            p2.vz -= nz * attract;
+          }
+        }
+      }
+
+      // Update 3D Positions, Rotations & Crystal/Liquid Intermolecular Bond Lines
+      const lineSegmentMesh = latticeLinesRef.current;
+      let segCount = 0;
+      const posArray = lineSegmentMesh
+        ? (lineSegmentMesh.geometry.attributes.position.array as Float32Array)
+        : null;
+
+      const showBonds = curPhase === 'solid' || curPhase === 'melting' || curPhase === 'liquid';
+      const maxBondDistSq = curPhase === 'solid' ? 2.6 : curPhase === 'melting' ? 2.9 : 2.3;
+
+      for (let i = 0; i < n; i++) {
+        const p = particles[i];
+        const rotFactor = curPhase === 'solid' ? 0.15 : 1.0;
+        p.rotX += p.vRotX * rotFactor;
+        p.rotY += p.vRotY * rotFactor;
+        p.rotZ += p.vRotZ * rotFactor;
 
         p.mesh.position.set(p.x, p.y, p.z);
         p.mesh.rotation.set(p.rotX, p.rotY, p.rotZ);
+
+        if (showBonds && posArray && segCount < maxBondSegments) {
+          for (let j = i + 1; j < n; j++) {
+            if (segCount >= maxBondSegments) break;
+            const p2 = particles[j];
+            const dx = p2.x - p.x;
+            const dy = p2.y - p.y;
+            const dz = p2.z - p.z;
+            if (dx * dx + dy * dy + dz * dz <= maxBondDistSq) {
+              const baseIdx = segCount * 6;
+              posArray[baseIdx] = p.x;
+              posArray[baseIdx + 1] = p.y;
+              posArray[baseIdx + 2] = p.z;
+              posArray[baseIdx + 3] = p2.x;
+              posArray[baseIdx + 4] = p2.y;
+              posArray[baseIdx + 5] = p2.z;
+              segCount++;
+            }
+          }
+        }
+      }
+
+      if (lineSegmentMesh) {
+        lineSegmentMesh.visible = showBonds && segCount > 0;
+        lineSegmentMesh.geometry.setDrawRange(0, segCount * 2);
+        lineSegmentMesh.geometry.attributes.position.needsUpdate = true;
+        if (lineSegmentMesh.material instanceof THREE.LineBasicMaterial) {
+          lineSegmentMesh.material.opacity = curPhase === 'solid' ? 0.42 : curPhase === 'melting' ? 0.28 : 0.16;
+        }
+      }
+
+      if (container.clientWidth > 0 && container.clientHeight > 0) {
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        const pr = renderer.getPixelRatio();
+        if (
+          Math.abs(renderer.domElement.width - Math.floor(cw * pr)) > 2 ||
+          Math.abs(renderer.domElement.height - Math.floor(ch * pr)) > 2
+        ) {
+          camera.aspect = cw / ch;
+          camera.updateProjectionMatrix();
+          renderer.setSize(cw, ch, false);
+        }
       }
 
       renderer.render(scene, camera);
@@ -635,7 +864,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
       if (newW <= 0 || newH <= 0) return;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
-      renderer.setSize(newW, newH);
+      renderer.setSize(newW, newH, false);
     };
 
     const resizeObserver = new ResizeObserver(() => {
@@ -695,17 +924,21 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
   };
 
   const handleZoom = (delta: number) => {
+    playLabSound('click');
     cameraSphericalRef.current.radius = Math.max(18, Math.min(65, cameraSphericalRef.current.radius + delta));
   };
 
   const handleResetCamera = () => {
+    playLabSound('click');
     cameraSphericalRef.current = { radius: 38, theta: Math.PI / 4, phi: Math.PI / 2.7 };
   };
 
   return (
-    <div className={`relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 border-2 border-slate-700/60 rounded-xl overflow-hidden shadow-2xl flex items-center justify-center select-none group transition-all ${
-      isFullscreen ? 'fixed inset-4 z-50 max-w-none aspect-auto shadow-2xl' : ''
-    }`}>
+    <div
+      className={`relative w-full aspect-[4/3] max-w-[460px] bg-slate-950 rounded-xl overflow-hidden flex items-center justify-center select-none group transition-all ${
+        isFullscreen ? 'fixed inset-4 z-50 max-w-none aspect-auto border-2 border-cyan-500/50 shadow-2xl' : ''
+      }`}
+    >
       {/* 3D Canvas Mount */}
       <div
         ref={containerRef}
@@ -718,35 +951,40 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
       />
 
       {/* Floating State HUD */}
-      <div className="absolute top-2 left-2 flex flex-col gap-1 z-20 pointer-events-none text-[10px] font-mono">
-        <div className="px-2 py-0.5 rounded bg-slate-900/85 backdrop-blur-md border border-cyan-500/40 text-cyan-300 flex items-center gap-1.5 shadow-md">
-          <span className="font-bold text-white">{substance.name}</span>
-          <span className="text-slate-500">|</span>
+      <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-20 pointer-events-none text-[10px] font-mono">
+        <div className="px-2.5 py-1 rounded-lg bg-slate-900/90 backdrop-blur-md border border-slate-700/80 text-cyan-300 flex items-center gap-1.5 shadow-md">
+          <span className="font-bold text-white">{t(substance.name, substance.nameEn)}</span>
+          <span className="text-slate-600">·</span>
           <span className="text-emerald-400 font-bold">{phaseName}</span>
-          <span className="text-slate-500">|</span>
-          <span className="text-cyan-400 font-bold">P = {pressureAtm.toFixed(2)} Atm</span>
+          <span className="text-slate-600">·</span>
+          <span className="text-cyan-400 font-bold">{actualTemp.toFixed(0)} K</span>
+          <span className="text-slate-600">·</span>
+          <span className="text-amber-400 font-bold">{pressureAtm.toFixed(2)} Atm</span>
         </div>
       </div>
 
       {/* Camera Controls */}
-      <div className="absolute bottom-2 right-2 flex items-center gap-1 z-20 bg-slate-900/80 backdrop-blur-md p-1 rounded-xl border border-slate-700 shadow-md">
+      <div className="absolute bottom-2.5 right-2.5 flex items-center gap-1 z-20 bg-slate-900/85 backdrop-blur-md p-1 rounded-xl border border-slate-800 shadow-md">
         <button
           onClick={() => handleZoom(-5)}
-          className="p-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
           title={t('تقريب (Zoom In)', 'Zoom In')}
         >
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => handleZoom(5)}
-          className="p-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
           title={t('تبعيد (Zoom Out)', 'Zoom Out')}
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={() => setAutoRotate(!autoRotate)}
-          className={`p-1 rounded-lg transition-colors ${
+          onClick={() => {
+            playLabSound('click');
+            setAutoRotate(!autoRotate);
+          }}
+          className={`p-1.5 rounded-lg transition-colors ${
             autoRotate ? 'bg-cyan-600 text-white' : 'hover:bg-slate-800 text-slate-300 hover:text-white'
           }`}
           title={t('دوران تلقائي (Auto-rotate)', 'Auto-rotate')}
@@ -755,22 +993,25 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         </button>
         <button
           onClick={handleResetCamera}
-          className="p-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
           title={t('إعادة ضبط زاوية الرؤية', 'Reset Camera')}
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={() => setIsFullscreen(!isFullscreen)}
-          className="p-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
+          onClick={() => {
+            playLabSound('click');
+            setIsFullscreen(!isFullscreen);
+          }}
+          className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition-colors"
           title={isFullscreen ? t('تصغير', 'Exit Fullscreen') : t('تكبير الشاشة', 'Fullscreen')}
         >
           {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-cyan-400" /> : <Maximize2 className="w-3.5 h-3.5" />}
         </button>
       </div>
 
-      <div className="absolute bottom-2 left-2 text-[10px] text-slate-400 font-mono bg-slate-950/70 px-2 py-0.5 rounded-md border border-slate-800 pointer-events-none">
-        <span>🖱️ {t('اسحب للتدوير 360° | عجل الماوس للتقريب', 'Drag 360° | Scroll zoom')}</span>
+      <div className="absolute bottom-2.5 left-2.5 text-[10px] text-slate-400 font-mono bg-slate-950/80 px-2.5 py-1 rounded-lg border border-slate-800/80 pointer-events-none">
+        <span>{t('اسحب للتدوير 360° · عجل الماوس للتقريب', 'Drag 360° · Scroll zoom')}</span>
       </div>
     </div>
   );

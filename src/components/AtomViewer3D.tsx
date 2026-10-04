@@ -14,6 +14,7 @@ import {
   Pause
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { playLabSound } from '../utils/soundEffects';
 
 export interface AtomViewer3DProps {
   protons: number;
@@ -106,8 +107,11 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
       alpha: true,
       powerPreference: 'high-performance'
     });
-    renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height, false);
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.display = 'block';
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.1;
     rendererRef.current = renderer;
@@ -596,6 +600,20 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
         cloudPoints.rotation.x += 0.001 * orbitSpeed;
       }
 
+      if (container.clientWidth > 0 && container.clientHeight > 0) {
+        const cw = container.clientWidth;
+        const ch = container.clientHeight;
+        const pr = renderer.getPixelRatio();
+        if (
+          Math.abs(renderer.domElement.width - Math.floor(cw * pr)) > 2 ||
+          Math.abs(renderer.domElement.height - Math.floor(ch * pr)) > 2
+        ) {
+          camera.aspect = cw / ch;
+          camera.updateProjectionMatrix();
+          renderer.setSize(cw, ch, false);
+        }
+      }
+
       renderer.render(scene, camera);
       animFrameRef.current = requestAnimationFrame(animate);
     };
@@ -610,7 +628,7 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
       if (newW <= 0 || newH <= 0) return;
       camera.aspect = newW / newH;
       camera.updateProjectionMatrix();
-      renderer.setSize(newW, newH);
+      renderer.setSize(newW, newH, false);
     };
 
     const resizeObserver = new ResizeObserver(() => {
@@ -748,7 +766,10 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
         {/* Model Mode Selector Tabs */}
         <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 backdrop-blur-md p-1 rounded-xl pointer-events-auto shadow-lg">
           <button
-            onClick={() => setViewType('bohr_spatial')}
+            onClick={() => {
+              playLabSound('click');
+              setViewType('bohr_spatial');
+            }}
             className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
               viewType === 'bohr_spatial'
                 ? 'bg-cyan-600 text-white shadow-sm'
@@ -759,7 +780,10 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
             {t('بور مجسم', '3D Bohr')}
           </button>
           <button
-            onClick={() => setViewType('rutherford')}
+            onClick={() => {
+              playLabSound('click');
+              setViewType('rutherford');
+            }}
             className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
               viewType === 'rutherford'
                 ? 'bg-cyan-600 text-white shadow-sm'
@@ -770,15 +794,18 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
             {t('رذرفورد', 'Rutherford')}
           </button>
           <button
-            onClick={() => setViewType('quantum_cloud')}
+            onClick={() => {
+              playLabSound('click');
+              setViewType('quantum_cloud');
+            }}
             className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
               viewType === 'quantum_cloud'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-cyan-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
             title={t('السحابة الإلكترونية الكمية الاحتمالية |ψ|²', 'Quantum Probability Cloud')}
           >
-            <Sparkles className="w-2.5 h-2.5" />
+            <Sparkles className="w-2.5 h-2.5 text-cyan-300" />
             <span>{t('السحابة الكمية', 'Cloud')}</span>
           </button>
         </div>

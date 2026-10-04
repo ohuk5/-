@@ -12,13 +12,16 @@ import {
   BookOpen,
   Compass,
   Box,
-  Sparkles
+  Sparkles,
+  Flame,
+  Radiation
 } from 'lucide-react';
 import { ALL_ELEMENTS, ELEMENT_MAP, ElementInfo, CATEGORY_COLORS } from '../data/elementsData';
 import { getElementDescription } from '../data/elementDescriptionsEn';
 import { PeriodicTableModal } from './PeriodicTableModal';
 import { AtomViewer3D } from './AtomViewer3D';
 import { useApp } from '../context/AppContext';
+import { playLabSound } from '../utils/soundEffects';
 
 interface NucleusNode {
   x: number;
@@ -34,7 +37,7 @@ interface AtomBuilderProps {
 }
 
 export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
-  const { lang, theme, t } = useApp();
+  const { lang, theme, t, activeLabPreset, clearLabExperiment, launchLabExperiment } = useApp();
   const isDark = theme === 'dark';
   const [protons, setProtons] = useState<number>(1);
   const [neutrons, setNeutrons] = useState<number>(0);
@@ -97,6 +100,52 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   const isProtonMagic = MAGIC_NUMBERS.includes(protons);
   const isNeutronMagic = MAGIC_NUMBERS.includes(neutrons);
   const isDoublyMagic = isProtonMagic && isNeutronMagic;
+
+  // Apply external preset if triggered from another module
+  useEffect(() => {
+    if (activeLabPreset && activeLabPreset.protons !== undefined) {
+      setProtons(activeLabPreset.protons);
+      if (activeLabPreset.neutrons !== undefined) setNeutrons(activeLabPreset.neutrons);
+      if (activeLabPreset.electrons !== undefined) setElectrons(activeLabPreset.electrons);
+      clearLabExperiment();
+    }
+  }, [activeLabPreset, clearLabExperiment]);
+
+  // Semi-Empirical Mass Formula (Bethe-Weizsäcker) Binding Energy per Nucleon (MeV)
+  const bindingEnergyPerNucleon = React.useMemo(() => {
+    const A = protons + neutrons;
+    const Z = protons;
+    const N = neutrons;
+    if (A <= 1 || Z === 0) return 0;
+    const aV = 15.75;
+    const aS = 17.8;
+    const aC = 0.711;
+    const aA = 23.7;
+    const vol = aV * A;
+    const surf = aS * Math.pow(A, 2 / 3);
+    const coul = aC * (Z * (Z - 1)) / Math.pow(A, 1 / 3);
+    const asym = aA * Math.pow(A - 2 * Z, 2) / A;
+    const pair = Z % 2 === 0 && N % 2 === 0 ? 11.2 / Math.sqrt(A) : Z % 2 !== 0 && N % 2 !== 0 ? -11.2 / Math.sqrt(A) : 0;
+    const totalB = Math.max(0, vol - surf - coul - asym + pair + (isDoublyMagic ? 4.5 : 0));
+    return Number((totalB / A).toFixed(2));
+  }, [protons, neutrons, isDoublyMagic]);
+
+  const valenceElectrons = React.useMemo(() => {
+    if (electrons <= 0) return 0;
+    if (electrons === protons && currentElement.electronShells && currentElement.electronShells.length > 0) {
+      return currentElement.electronShells[currentElement.electronShells.length - 1];
+    }
+    const shellMax = [2, 8, 18, 32, 32, 18, 8];
+    let rem = electrons;
+    let last = 0;
+    for (let i = 0; i < shellMax.length; i++) {
+      if (rem > 0) {
+        last = Math.min(rem, shellMax[i]);
+        rem -= last;
+      }
+    }
+    return last;
+  }, [electrons, protons, currentElement]);
 
   // Sync nucleus nodes when particle count changes
   useEffect(() => {
@@ -548,6 +597,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   }, [protons, neutrons, electrons, isStable, currentElement, showSpinArrows, orbitSpeed, dimensionMode]);
 
   const loadElement = (el: ElementInfo) => {
+    playLabSound('nucleon');
     setProtons(el.atomicNumber);
     const stableN = el.stableNeutrons && el.stableNeutrons.length > 0
       ? el.stableNeutrons[el.stableNeutrons.length - 1]
@@ -558,19 +608,90 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   };
 
   const resetAtom = () => {
+    playLabSound('click');
     setProtons(0);
     setNeutrons(0);
     setElectrons(0);
     setSelectedPreset('');
   };
 
+  const stabilizeCurrentNucleus = () => {
+    playLabSound('success');
+    const stableN = currentElement.stableNeutrons && currentElement.stableNeutrons.length > 0
+      ? currentElement.stableNeutrons[0]
+      : Math.round(currentElement.atomicMass) - protons;
+    setNeutrons(Math.max(0, stableN));
+  };
+
+  const neutralizeCurrentAtom = () => {
+    playLabSound('nucleon');
+    setElectrons(protons);
+  };
+
   const colors = CATEGORY_COLORS[currentElement.category] || CATEGORY_COLORS['nonmetal'];
 
   return (
     <div className="w-full space-y-6 overflow-x-hidden">
-      <div className="w-full flex flex-col md:flex-row gap-5 items-start">
+      {/* Unified Quick Atomic & Quantum Models Bar */}
+      <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-md ${
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+      }`}>
+        <div className={`flex items-center gap-2 text-xs font-bold shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+          <Sparkles className="w-4 h-4 text-cyan-400" />
+          <span>{t('نماذج ذرية وأيونية سريعة:', 'Quick Atomic & Ionic Models:')}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs font-bold no-scrollbar flex-1">
+          {[
+            { label: t('¹H الهيدروجين', '¹H Hydrogen'), p: 1, n: 0, e: 1 },
+            { label: t('⁴He الهيليوم (سحري)', '⁴He Helium (Magic)'), p: 2, n: 2, e: 2 },
+            { label: t('¹²C الكربون الأساسي', '¹²C Carbon-12'), p: 6, n: 6, e: 6 },
+            { label: t('¹⁴C الكربون المشع', '¹⁴C Carbon-14'), p: 6, n: 8, e: 6 },
+            { label: t('²³Na⁺ أيون الصوديوم', '²³Na⁺ Sodium Ion'), p: 11, n: 12, e: 10 },
+            { label: t('⁵⁶Fe الحديد المستقر', '⁵⁶Fe Iron-56'), p: 26, n: 30, e: 26 },
+            { label: t('¹⁹⁷Au الذهب النبيل', '¹⁹⁷Au Noble Gold'), p: 79, n: 118, e: 79 },
+            { label: t('²⁰⁸Pb رصاص سحري مزدوج', '²⁰⁸Pb Doubly Magic'), p: 82, n: 126, e: 82 },
+            { label: t('²³⁸U اليورانيوم المشع', '²³⁸U Uranium-238'), p: 92, n: 146, e: 92 },
+          ].map((preset, idx) => {
+            const isCurrent = protons === preset.p && neutrons === preset.n && electrons === preset.e;
+            return (
+              <button
+                key={idx}
+                onClick={() => {
+                  playLabSound('nucleon');
+                  setProtons(preset.p);
+                  setNeutrons(preset.n);
+                  setElectrons(preset.e);
+                }}
+                className={`px-3 py-1.5 rounded-xl border transition-all whitespace-nowrap flex items-center gap-1 ${
+                  isCurrent
+                    ? 'bg-cyan-600 border-cyan-500 text-white shadow-sm'
+                    : isDark
+                    ? 'bg-slate-950/70 hover:bg-slate-800 border-slate-800 text-slate-300'
+                    : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                }`}
+              >
+                <span>{preset.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={() => {
+            playLabSound('click');
+            setIsPeriodicTableOpen(true);
+          }}
+          className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
+        >
+          <Table className="w-3.5 h-3.5" />
+          <span>{t('الجدول الدوري (118)', 'Periodic Table (118)')}</span>
+        </button>
+      </div>
+
+      <div className="w-full flex flex-col md:flex-row gap-5 items-start overflow-x-hidden">
         {/* Left: Particle Controls Deck */}
-        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
+        <div className="w-full md:w-[300px] lg:w-[330px] xl:w-[340px] shrink-0 min-w-0 flex flex-col gap-4 order-2 md:order-1">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -744,6 +865,33 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
               />
             </div>
 
+            {/* Quick Stabilize & Neutralize Physics Helpers */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={stabilizeCurrentNucleus}
+                disabled={protons === 0 || isStable}
+                className={`py-1.5 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center justify-center gap-1 disabled:opacity-40 ${
+                  isDark ? 'bg-emerald-950/40 hover:bg-emerald-900/50 border-emerald-800/60 text-emerald-300' : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'
+                }`}
+                title={t('ضبط عدد النيوترونات للوصول إلى النظير الأكثر استقراراً', 'Set neutron count to most stable isotope')}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{t('موازنة استقرار النواة', 'Stabilize Nucleus')}</span>
+              </button>
+
+              <button
+                onClick={neutralizeCurrentAtom}
+                disabled={protons === 0 || netCharge === 0}
+                className={`py-1.5 px-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center justify-center gap-1 disabled:opacity-40 ${
+                  isDark ? 'bg-cyan-950/40 hover:bg-cyan-900/50 border-cyan-800/60 text-cyan-300' : 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200 text-cyan-700'
+                }`}
+                title={t('مساواة عدد الإلكترونات بالبروتونات لتصبح الشحنة صفراً', 'Match electrons to protons for neutral charge')}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>{t('موازنة الشحنة (0)', 'Neutralize (0)')}</span>
+              </button>
+            </div>
+
             {/* Quick Actions & Presets */}
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
@@ -833,10 +981,10 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         </div>
 
         {/* Right / Main Simulator Stage */}
-        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+        <div className="w-full flex-1 min-w-0 flex flex-col xl:flex-row gap-5 order-1 md:order-2">
           {/* Middle: Interactive Canvas Viewport */}
-          <div className="w-full lg:flex-1 flex flex-col items-center gap-3">
-          <div className={`w-full border rounded-2xl p-4 shadow-lg flex flex-col items-center ${
+          <div className="w-full xl:flex-1 min-w-0 flex flex-col items-center gap-3">
+          <div className={`w-full min-w-0 border rounded-2xl p-4 shadow-lg flex flex-col items-center ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
             {/* Top View Mode Switcher: 3D vs 2D vs Split */}
@@ -1005,7 +1153,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         </div>
 
         {/* Right: Chemical Identity & Live Specs */}
-        <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
+        <div className="w-full xl:w-[310px] shrink-0 min-w-0 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -1137,6 +1285,22 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
               </div>
             )}
 
+            {/* Nuclear Binding Energy & Valence Telemetry */}
+            <div className="grid grid-cols-2 gap-2 text-center text-xs">
+              <div className={`p-2.5 rounded-xl border ${
+                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className="text-slate-400 font-semibold block text-[10px] mb-0.5">{t('طاقة الترابط النووي / نوية', 'Binding Energy (B/A)')}</span>
+                <span className="text-sm font-mono font-extrabold text-cyan-400">{bindingEnergyPerNucleon} MeV</span>
+              </div>
+              <div className={`p-2.5 rounded-xl border ${
+                isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
+              }`}>
+                <span className="text-slate-400 font-semibold block text-[10px] mb-0.5">{t('إلكترونات التكافؤ', 'Valence Electrons')}</span>
+                <span className="text-sm font-mono font-extrabold text-amber-400">{valenceElectrons} e⁻</span>
+              </div>
+            </div>
+
             {/* Electron Configuration */}
             <div className={`p-3 rounded-xl border space-y-1.5 ${
               isDark ? 'bg-slate-950/60 border-slate-800/80' : 'bg-slate-50 border-slate-200'
@@ -1167,6 +1331,46 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
               isDark ? 'bg-slate-950/40 border-slate-800/60 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
             }`}>
               <p>{getElementDescription(currentElement, lang)}</p>
+            </div>
+
+            {/* Cross-Module Scientific Bridges */}
+            <div className="grid grid-cols-1 gap-2 pt-1">
+              <button
+                onClick={() => {
+                  const subMap: Record<number, string> = {
+                    1: 'water', 2: 'helium', 6: 'co2', 7: 'nitrogen', 8: 'oxygen',
+                    10: 'neon', 18: 'argon', 22: 'titanium', 26: 'iron',
+                    31: 'gallium', 35: 'bromine', 54: 'xenon', 79: 'gold', 80: 'mercury'
+                  };
+                  launchLabExperiment('states-of-matter', {
+                    substanceId: subMap[protons] || 'water',
+                    targetTemp: 300
+                  });
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-cyan-950/60 hover:bg-cyan-900/70 border border-cyan-700/50 text-cyan-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Flame className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{t('اختبر المادة في محاكي الحالات والحرارة', 'Test in States of Matter Simulator')}</span>
+              </button>
+
+              {(!isStable || protons >= 84 || [6, 27, 38, 53, 55].includes(protons)) && (
+                <button
+                  onClick={() => {
+                    const isoMap: Record<number, string> = {
+                      6: 'carbon14', 27: 'cobalt60', 38: 'strontium90', 53: 'iodine131',
+                      55: 'cesium137', 84: 'polonium210', 86: 'radon222', 88: 'radium226',
+                      90: 'thorium232', 92: 'uranium238', 94: 'plutonium239', 95: 'americium241'
+                    };
+                    launchLabExperiment('radioactive-decay', {
+                      isotopeId: isoMap[protons] || 'uranium238'
+                    });
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-700/50 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <Radiation className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{t('محاكاة الاضمحلال الإشعاعي وعمر النصف', 'Simulate Radioactive Decay')}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

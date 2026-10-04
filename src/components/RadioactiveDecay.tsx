@@ -12,10 +12,13 @@ import {
   Info,
   CheckCircle2,
   Sparkles,
-  BookOpen
+  BookOpen,
+  Atom,
+  Shield
 } from 'lucide-react';
 import { ISOTOPES, IsotopeInfo } from '../data/isotopesData';
 import { useApp } from '../context/AppContext';
+import { playLabSound } from '../utils/soundEffects';
 
 interface DecayCell {
   id: number;
@@ -32,6 +35,8 @@ interface EjectedParticle {
   color: string;
   label: string;
   life: number;
+  pType?: 'alpha' | 'beta' | 'gamma' | 'neutrino';
+  blocked?: boolean;
 }
 
 interface RadioactiveDecayProps {
@@ -39,9 +44,10 @@ interface RadioactiveDecayProps {
 }
 
 export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide }) => {
-  const { lang, theme, t } = useApp();
+  const { lang, theme, t, activeLabPreset, clearLabExperiment, launchLabExperiment } = useApp();
   const isDark = theme === 'dark';
   const [selectedIsotopeId, setSelectedIsotopeId] = useState<string>('carbon14');
+  const [shieldType, setShieldType] = useState<'none' | 'paper' | 'aluminum' | 'lead'>('none');
   const [gridCells, setGridCells] = useState<DecayCell[]>([]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [elapsedCycles, setElapsedCycles] = useState<number>(0);
@@ -85,6 +91,13 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
   }, []);
 
   useEffect(() => {
+    if (activeLabPreset && activeLabPreset.isotopeId && ISOTOPES[activeLabPreset.isotopeId]) {
+      setSelectedIsotopeId(activeLabPreset.isotopeId);
+      clearLabExperiment();
+    }
+  }, [activeLabPreset, clearLabExperiment]);
+
+  useEffect(() => {
     initSimulation();
   }, [selectedIsotopeId, initSimulation]);
 
@@ -111,6 +124,7 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
 
     setGridCells(nextCells);
     setElapsedCycles(nextCycle);
+    playLabSound('geiger');
 
     // Guaranteed deduplication: ensure exactly ONE entry exists per cycle on X-axis
     setHistoryPoints(prev => {
@@ -186,6 +200,7 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         if (vibrationIntensityRef.current >= 5.5) {
           setSingleStatus('exploding');
           explosionTimeRef.current = 0;
+          playLabSound('geiger');
           spawnEjectedParticles(cx, cy);
         }
       }
@@ -268,18 +283,56 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         ctx.fillText(activeIsotope.daughterSymbol, nx, ny + 4);
       }
 
-      // Draw Ejected Particles (Alpha / Beta / Gamma)
+      // Draw Radiation Shielding Barrier if active
+      const barrierX = cx + 62;
+      if (shieldType !== 'none') {
+        const barrierW = shieldType === 'paper' ? 4 : shieldType === 'aluminum' ? 9 : 16;
+        const barrierColor = shieldType === 'paper' ? '#f8fafc' : shieldType === 'aluminum' ? '#94a3b8' : '#334155';
+        const barrierBorder = shieldType === 'paper' ? '#cbd5e1' : shieldType === 'aluminum' ? '#38bdf8' : '#64748b';
+
+        ctx.fillStyle = barrierColor;
+        ctx.fillRect(barrierX, 34, barrierW, h - 52);
+        ctx.strokeStyle = barrierBorder;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(barrierX, 34, barrierW, h - 52);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 8.5px Cairo, sans-serif';
+        ctx.textAlign = 'center';
+        const shieldLabel =
+          shieldType === 'paper'
+            ? lang === 'ar' ? 'ورق' : 'Paper'
+            : shieldType === 'aluminum'
+            ? lang === 'ar' ? 'ألومنيوم' : 'Al 5mm'
+            : lang === 'ar' ? 'رصاص' : 'Lead 5cm';
+        ctx.fillText(shieldLabel, barrierX + barrierW / 2, h - 8);
+      }
+
+      // Draw Ejected Particles (Alpha / Beta / Gamma) with Shielding Collision Physics
       const particles = ejectedParticlesRef.current;
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
-        
-        // Decelerate and hold particle inside canvas bounds
+
+        // Check if blocked by radiation shield barrier
+        const isStoppedByBarrier =
+          (shieldType === 'paper' && p.pType === 'alpha') ||
+          (shieldType === 'aluminum' && (p.pType === 'alpha' || p.pType === 'beta')) ||
+          (shieldType === 'lead' && (p.pType === 'alpha' || p.pType === 'beta' || p.pType === 'gamma'));
+
         const distFromCenter = Math.sqrt((p.x - cx) * (p.x - cx) + (p.y - cy) * (p.y - cy));
-        if (distFromCenter < 100) {
-          p.x += p.vx;
-          p.y += p.vy;
-          p.vx *= 0.94;
-          p.vy *= 0.94;
+        if (distFromCenter < 115 && !p.blocked) {
+          const nextX = p.x + p.vx;
+          if (shieldType !== 'none' && isStoppedByBarrier && nextX + p.size >= barrierX) {
+            p.x = barrierX - p.size - 1;
+            p.vx = 0;
+            p.vy = 0;
+            p.blocked = true;
+          } else {
+            p.x = nextX;
+            p.y += p.vy;
+            p.vx *= 0.94;
+            p.vy *= 0.94;
+          }
         }
 
         // Clamp securely inside canvas
@@ -357,28 +410,29 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
       isRunning = false;
       if (singleAnimFrameRef.current) cancelAnimationFrame(singleAnimFrameRef.current);
     };
-  }, [singleStatus, activeIsotope, lang]);
+  }, [singleStatus, activeIsotope, lang, shieldType]);
 
   const spawnEjectedParticles = (cx: number, cy: number) => {
     const list: EjectedParticle[] = [];
 
     if (activeIsotope.decayMode === 'alpha') {
       // Alpha particle (He-4 nucleus)
-      const angle = (Math.random() - 0.5) * (Math.PI / 3);
+      const angle = (Math.random() - 0.5) * (Math.PI / 5);
       list.push({
         x: cx + 15,
         y: cy,
-        vx: Math.cos(angle) * 4.2,
-        vy: Math.sin(angle) * 4.2,
+        vx: Math.cos(angle) * 4.5,
+        vy: Math.sin(angle) * 4.5,
         size: 9,
         color: '#f97316',
         label: 'جسيم ألفا (⁴₂He²⁺)',
-        life: 1.0
+        life: 1.0,
+        pType: 'alpha'
       });
     } else if (activeIsotope.decayMode === 'beta') {
       // Beta particle + Antineutrino
-      const angle1 = -Math.PI / 6 + (Math.random() - 0.5) * 0.4;
-      const angle2 = Math.PI / 4 + (Math.random() - 0.5) * 0.4;
+      const angle1 = -Math.PI / 10;
+      const angle2 = Math.PI / 8;
 
       list.push({
         x: cx + 15,
@@ -388,7 +442,8 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         size: 4.5,
         color: '#38bdf8',
         label: 'جسيم بيتا (e⁻)',
-        life: 1.0
+        life: 1.0,
+        pType: 'beta'
       });
 
       list.push({
@@ -399,13 +454,14 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         size: 2.5,
         color: '#4ade80',
         label: 'ضديد نيوترينو (ν̄)',
-        life: 0.9
+        life: 0.9,
+        pType: 'neutrino'
       });
     } else {
       // Beta + Gamma photons
-      const angle1 = -Math.PI / 4;
-      const angle2 = Math.PI / 4;
-      const angle3 = Math.PI / 10;
+      const angle1 = -Math.PI / 7;
+      const angle2 = 0;
+      const angle3 = Math.PI / 7;
 
       list.push({
         x: cx + 15,
@@ -415,7 +471,8 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         size: 4.5,
         color: '#38bdf8',
         label: 'جسيم بيتا (e⁻)',
-        life: 1.0
+        life: 1.0,
+        pType: 'beta'
       });
 
       list.push({
@@ -426,7 +483,8 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         size: 6.0,
         color: '#eab308',
         label: 'أشعة غاما (γ)',
-        life: 1.0
+        life: 1.0,
+        pType: 'gamma'
       });
 
       list.push({
@@ -437,7 +495,8 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         size: 2.5,
         color: '#4ade80',
         label: 'ضديد نيوترينو (ν̄)',
-        life: 0.85
+        life: 0.85,
+        pType: 'neutrino'
       });
     }
 
@@ -458,9 +517,62 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
 
   return (
     <div className="w-full space-y-6 overflow-x-hidden">
+      {/* Unified Quick Nuclear & Radiometric Scenarios Bar */}
+      <div className={`p-3.5 sm:p-4 rounded-2xl border flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-md ${
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+      }`}>
+        <div className={`flex items-center gap-2 text-xs font-bold shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+          <Sparkles className="w-4 h-4 text-cyan-400" />
+          <span>{t('تطبيقات النظائر المشعة السريعة:', 'Quick Nuclear Scenarios:')}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs font-bold no-scrollbar flex-1">
+          {[
+            { id: 'carbon14', label: t('🦴 تأريخ الأحافير (¹⁴C)', '🦴 Carbon Dating (¹⁴C)') },
+            { id: 'cobalt60', label: t('🏥 علاج الأورام (⁶⁰Co)', '🏥 Cancer Therapy (⁶⁰Co)') },
+            { id: 'iodine131', label: t('🧬 الغدة الدرقية (¹³¹I)', '🧬 Thyroid Med (¹³¹I)') },
+            { id: 'americium241', label: t('🔔 كاشف الدخان (²⁴¹Am)', '🔔 Smoke Detector (²⁴¹Am)') },
+            { id: 'uranium235', label: t('⚡ وقود المفاعلات (²³⁵U)', '⚡ Reactor Fuel (²³⁵U)') },
+            { id: 'plutonium239', label: t('🛰️ طاقة الفضاء (²³⁹Pu)', '🛰️ Space Power (²³⁹Pu)') },
+            { id: 'polonium210', label: t('☢️ البولونيوم (²¹⁰Po)', '☢️ Polonium (²¹⁰Po)') },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                playLabSound('click');
+                setSelectedIsotopeId(item.id);
+              }}
+              className={`px-3 py-1.5 rounded-xl border transition-all whitespace-nowrap flex items-center gap-1 ${
+                selectedIsotopeId === item.id
+                  ? 'bg-cyan-600 border-cyan-500 text-white shadow-sm'
+                  : isDark
+                  ? 'bg-slate-950/70 hover:bg-slate-800 border-slate-800 text-slate-300'
+                  : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+              }`}
+            >
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => {
+            launchLabExperiment('atom-builder', {
+              protons: activeIsotope.atomicNumber,
+              neutrons: activeIsotope.massNumber - activeIsotope.atomicNumber,
+              electrons: activeIsotope.atomicNumber
+            });
+          }}
+          className="px-3 py-1.5 rounded-xl bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-xs font-bold text-cyan-300 transition-all flex items-center justify-center gap-1.5 shrink-0"
+        >
+          <Atom className="w-3.5 h-3.5 text-cyan-400" />
+          <span>{t('فحص النواة في بناء الذرة', 'Inspect in Atom Builder')}</span>
+        </button>
+      </div>
+
       <div className="w-full flex flex-col md:flex-row gap-5 items-start overflow-x-hidden">
         {/* Left: Isotope Selector & Nuclear Specs */}
-        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
+        <div className="w-full md:w-[300px] lg:w-[330px] xl:w-[340px] shrink-0 min-w-0 flex flex-col gap-4 order-2 md:order-1">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -613,6 +725,53 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
               />
             </div>
 
+            {/* Radiation Shielding & Penetration Tester Controls */}
+            <div className={`p-2.5 rounded-xl border space-y-2 ${
+              isDark ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold text-cyan-400 flex items-center gap-1">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>{t('اختبار اختراق الدروع الواقية:', 'Radiation Shielding Test:')}</span>
+                </span>
+                <span className="font-mono text-[10px] text-slate-400">
+                  {shieldType === 'none'
+                    ? t('نفاذ كامل 100%', '100% Penetration')
+                    : (shieldType === 'paper' && activeIsotope.decayMode === 'alpha') ||
+                      (shieldType === 'aluminum' && (activeIsotope.decayMode === 'alpha' || activeIsotope.decayMode === 'beta')) ||
+                      shieldType === 'lead'
+                    ? t('🛡️ تم حجب الإشعاع!', '🛡️ Radiation Blocked!')
+                    : t('⚠️ يخترق هذا الحاجز!', '⚠️ Penetrates Shield!')}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 text-[10px] font-bold">
+                {[
+                  { id: 'none' as const, label: t('بدون حاجز', 'None') },
+                  { id: 'paper' as const, label: t('ورق (يحجب α)', 'Paper (α)') },
+                  { id: 'aluminum' as const, label: t('ألومنيوم (β)', 'Alum (β)') },
+                  { id: 'lead' as const, label: t('رصاص (γ)', 'Lead (γ)') },
+                ].map(sh => (
+                  <button
+                    key={sh.id}
+                    type="button"
+                    onClick={() => {
+                      playLabSound('click');
+                      setShieldType(sh.id);
+                    }}
+                    className={`py-1.5 px-1 rounded-lg border transition-all text-center truncate ${
+                      shieldType === sh.id
+                        ? 'bg-cyan-600 border-cyan-500 text-white shadow-xs'
+                        : isDark
+                        ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                        : 'bg-white border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {sh.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
                 onClick={triggerSingleDecay}
@@ -697,9 +856,9 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         </div>
 
         {/* Main Simulation Stage & Decay Curves */}
-        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+        <div className="w-full flex-1 min-w-0 flex flex-col xl:flex-row gap-5 order-1 md:order-2">
           {/* Middle: 100 Nuclei Stochastic Grid */}
-          <div className="w-full lg:flex-1 flex flex-col gap-4">
+          <div className="w-full xl:flex-1 min-w-0 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -824,7 +983,7 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         </div>
 
           {/* Right: Exponential Decay Chart & Scientific Insights */}
-          <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
+          <div className="w-full xl:w-[310px] shrink-0 min-w-0 flex flex-col gap-4">
           <div className={`border rounded-2xl p-4 sm:p-5 shadow-lg space-y-4 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>

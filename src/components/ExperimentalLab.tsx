@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { LabViewer3D } from './LabViewer3D';
+import { playLabSound, LabSoundType } from '../utils/soundEffects';
 
 // Reagent definition for safe chemical lab
 interface LabReagent {
@@ -362,6 +363,17 @@ export const ExperimentalLab: React.FC = () => {
   const [currentTempC, setCurrentTempC] = useState<number>(23.5); // Room temp
   const [effervescenceBubbles, setEffervescenceBubbles] = useState<number>(0);
   const [dispenseAnimCounter, setDispenseAnimCounter] = useState<number>(0);
+  const [dispenseInfo, setDispenseInfo] = useState<{
+    count: number;
+    type: 'liquid' | 'indicator' | 'solid' | 'powder';
+    color: string;
+  }>({ count: 0, type: 'liquid', color: '#38bdf8' });
+  const [explosionEvent3D, setExplosionEvent3D] = useState<{
+    id: number;
+    type: 'sodium' | 'potassium' | 'magnesium' | 'hydrogen_pop' | 'spark' | 'catalytic_eruption' | 'ethanol_fire';
+  } | null>(null);
+  const [activeSkitteringMetal, setActiveSkitteringMetal] = useState<'none' | 'sodium' | 'potassium'>('none');
+  const skitterTimeoutRef = useRef<number | null>(null);
   const [lastActionMessage, setLastActionMessage] = useState<string>(
     lang === 'ar' ? 'المعمل جاهز للبدء. أضف المواد أو شغّل الأدوات بحرية.' : 'Lab ready. Add reagents or activate tools freely.'
   );
@@ -468,61 +480,9 @@ export const ExperimentalLab: React.FC = () => {
     progress: number;
   } | null>(null);
 
-  // Web Audio Synthetic Sound Engine (Client-side, Safe)
-  const playSoundEffect = (type: 'explosion' | 'spark' | 'pour') => {
-    if (isSoundMuted) return;
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      if (type === 'explosion') {
-        const bufferSize = Math.floor(ctx.sampleRate * 0.45);
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.08));
-        }
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(700, ctx.currentTime);
-        filter.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.44);
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.55, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.44);
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        noise.start();
-      } else if (type === 'spark') {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(1400, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.1);
-        gain.gain.setValueAtTime(0.25, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.1);
-      } else if (type === 'pour') {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(520, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(820, ctx.currentTime + 0.08);
-        gain.gain.setValueAtTime(0.18, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.08);
-      }
-    } catch {
-      // Audio playback blocked or unsupported
-    }
+  // Web Audio Synthetic Sound Engine (Singleton, Rich Laboratory Effects)
+  const playSoundEffect = (type: LabSoundType) => {
+    playLabSound(type, isSoundMuted);
   };
 
   const triggerExplosion = (
@@ -530,7 +490,26 @@ export const ExperimentalLab: React.FC = () => {
     customX?: number,
     customY?: number
   ) => {
-    playSoundEffect(type === 'spark' ? 'spark' : 'explosion');
+    if (type === 'spark') {
+      playSoundEffect('spark');
+    } else if (type === 'potassium') {
+      playSoundEffect('potassium_explosion');
+    } else if (type === 'magnesium') {
+      playSoundEffect('magnesium_flare');
+    } else if (type === 'hydrogen_pop') {
+      playSoundEffect('hydrogen_pop');
+    } else if (type === 'catalytic_eruption') {
+      playSoundEffect('catalytic_eruption');
+    } else {
+      playSoundEffect('explosion');
+    }
+
+    // Trigger 3D explosion event for LabViewer3D!
+    setExplosionEvent3D(prev => ({
+      id: (prev?.id || 0) + 1,
+      type
+    }));
+
     screenShakeRef.current = type === 'magnesium' ? 8 : type === 'potassium' ? 16 : type === 'spark' ? 2 : type === 'catalytic_eruption' ? 6 : 14;
     flashOverlayRef.current = {
       color: type === 'magnesium'
@@ -632,25 +611,37 @@ export const ExperimentalLab: React.FC = () => {
     };
   };
 
-  // Chemical Calculation: Net Acid/Base moles and pH
-  const netMolesAcid = Math.max(0, content.acidMl * 0.1 - content.baseMl * 0.1 - content.ammoniaMl * 0.06 - content.bakingSodaG * 0.012);
-  const netMolesBase = Math.max(0, content.baseMl * 0.1 + content.ammoniaMl * 0.06 - content.acidMl * 0.1);
-  const volLiters = Math.max(0.01, totalVolumeMl / 1000);
+  // Chemical Calculation: Unified Continuous Acid/Base Equilibrium & pH
+  // Every single drop, mL, or gram of any acidic or alkaline substance dynamically shifts pH
+  const totalAcidUnits =
+    content.acidMl * 2.5 +
+    (content.aceticAcidMl || 0) * 1.2 +
+    content.copperSulfateMl * 0.45 +
+    content.silverNitrateMl * 0.25 +
+    content.peroxideMl * 0.18 +
+    (content.bariumG || 0) * 0.10;
+
+  const totalBaseUnits =
+    content.baseMl * 2.5 +
+    content.ammoniaMl * 1.4 +
+    content.bakingSodaG * 0.65 +
+    content.calciumChlorideG * 0.08;
+
+  const netAcidBase = totalAcidUnits - totalBaseUnits;
+  const effectiveSolventScale = Math.max(0.25, content.waterMl / 100);
 
   let currentPh = 7.0;
   if (totalVolumeMl <= 0) {
     currentPh = 7.0;
-  } else if (netMolesAcid > 0.0001) {
-    const hConc = netMolesAcid / volLiters;
-    currentPh = Math.max(1.0, Math.min(6.8, -Math.log10(Math.max(0.000001, hConc))));
-  } else if (netMolesBase > 0.0001) {
-    const ohConc = netMolesBase / volLiters;
-    const pOH = -Math.log10(Math.max(0.000001, ohConc));
-    currentPh = Math.max(7.2, Math.min(13.8, 14.0 - pOH));
-  } else if (content.bakingSodaG > 0) {
-    currentPh = 8.3; // buffered mildly basic
-  } else if (content.copperSulfateMl > 0) {
-    currentPh = 5.2; // mildly acidic
+  } else if (netAcidBase > 0.001) {
+    const acidIntensity = (netAcidBase / effectiveSolventScale) + netAcidBase * 0.15;
+    const rawPh = 7.0 - 1.85 * Math.log10(1 + acidIntensity * 2.8) - acidIntensity * 0.03;
+    currentPh = Math.max(0.8, Math.min(6.95, rawPh));
+  } else if (netAcidBase < -0.001) {
+    const baseUnits = -netAcidBase;
+    const baseIntensity = (baseUnits / effectiveSolventScale) + baseUnits * 0.15;
+    const rawPh = 7.0 + 1.85 * Math.log10(1 + baseIntensity * 2.8) + baseIntensity * 0.03;
+    currentPh = Math.max(7.05, Math.min(13.9, rawPh));
   }
 
   // Determine Appearance / Fluid Color in Beaker
@@ -719,16 +710,46 @@ export const ExperimentalLab: React.FC = () => {
     if (!reg) return;
 
     setDispenseAnimCounter(prev => prev + 1);
+    setDispenseInfo(prev => ({
+      count: prev.count + 1,
+      type: reg.type,
+      color: reg.defaultColor.startsWith('rgba') ? '#38bdf8' : reg.defaultColor
+    }));
 
-    if (reg.type === 'liquid' || reg.type === 'indicator') {
+    const isSingleDrop =
+      (reg.type === 'liquid' && (customAmount === 0.6 || (customAmount === undefined && dispenseMode === 'drop'))) ||
+      reg.type === 'indicator';
+
+    if (reg.id === 'ice_cubes') {
+      playSoundEffect('ice');
+    } else if (isSingleDrop) {
+      triggerPourAnimation(reg.defaultColor);
+      playSoundEffect('drop');
+    } else if (reg.type === 'liquid') {
       triggerPourAnimation(reg.defaultColor);
     } else {
-      playSoundEffect('pour');
+      playSoundEffect('solid');
     }
 
-    const amountMl = customAmount !== undefined && reg.type === 'liquid' ? customAmount : dispenseAmountMl;
+    const isDropDispense = reg.type === 'liquid' && customAmount === undefined && dispenseMode === 'drop';
+    const amountMl =
+      customAmount !== undefined && reg.type === 'liquid'
+        ? customAmount
+        : isDropDispense
+        ? Number((dispenseDrops * 0.6).toFixed(2))
+        : dispenseAmountMl;
     const drops = customAmount !== undefined && reg.type === 'indicator' ? customAmount : dispenseDrops;
     const grams = customAmount !== undefined && (reg.type === 'solid' || reg.type === 'powder') ? customAmount : dispenseGrams;
+    const doseLabelAr = isDropDispense
+      ? `${dispenseDrops} ${dispenseDrops === 1 ? 'قطرة' : 'قطرات'} (${amountMl} مل)`
+      : customAmount === 0.6
+      ? `قطرة واحدة (0.6 مل)`
+      : `${amountMl} مل`;
+    const doseLabelEn = isDropDispense
+      ? `${dispenseDrops} drop(s) (${amountMl} mL)`
+      : customAmount === 0.6
+      ? `1 drop (0.6 mL)`
+      : `${amountMl} mL`;
 
     setContent(prev => {
       const next = { ...prev };
@@ -739,7 +760,7 @@ export const ExperimentalLab: React.FC = () => {
         if (next.potassiumG > 0) {
           triggerExplosion('potassium');
           next.potassiumG = 0;
-          next.baseMl = Math.min(100, next.baseMl + 25);
+          next.baseMl = Math.min(500, next.baseMl + 25);
           next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + 30);
           setCurrentTempC(prevT => Math.min(99, prevT + 48));
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 50));
@@ -747,44 +768,48 @@ export const ExperimentalLab: React.FC = () => {
         } else if (next.sodiumG > 0) {
           triggerExplosion('sodium');
           next.sodiumG = 0;
-          next.baseMl = Math.min(100, next.baseMl + 20);
+          next.baseMl = Math.min(500, next.baseMl + 20);
           next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + 25);
           setCurrentTempC(prevT => Math.min(99, prevT + 40));
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 45));
           setLastActionMessage(t(`💥 انفجار عنيف! لامس الماء الصوديوم فانفجر بلهب أصفر ساطع، وصدمة انفجارية وغاز هيدروجين!`, `💥 Violent explosion! Water touched sodium, detonating with brilliant yellow flame, shockwave, and H2 gas!`));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من الماء المقطر بدقة.`, `Added precisely ${amountMl} mL of distilled water.`));
+          setLastActionMessage(t(`تمت إضافة ${doseLabelAr} من الماء المقطر بدقة.`, `Added precisely ${doseLabelEn} of distilled water.`));
         }
       } else if (reagentId === 'acid_hcl') {
-        next.acidMl = Math.min(100, next.acidMl + amountMl);
+        next.acidMl = Math.min(500, next.acidMl + amountMl);
         // If magnesium is present, rapid exothermic reaction with H2 gas!
         if (next.magnesiumG > 0) {
+          playSoundEffect('fizz');
           next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + 30);
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 40));
           setCurrentTempC(prevT => Math.min(92, prevT + 22));
           next.magnesiumG = Math.max(0, next.magnesiumG - 2);
           setLastActionMessage(t(`تفاعل شريط المغنيسيوم مع الحمض بفوران عنيف وتصاعد كثيف لغاز الهيدروجين H₂ القابل للاشتعال!`, `Magnesium reacted vigorously with acid releasing abundant flammable H2 gas!`));
         } else if (next.bakingSodaG > 0.5) {
+          playSoundEffect('fizz');
           setEffervescenceBubbles(prevB => Math.min(45, prevB + 25));
           next.bakingSodaG = Math.max(0, next.bakingSodaG - amountMl * 0.2);
           setLastActionMessage(t('تفاعل فوران نشط! تفاعل الحمض مع الكربونات وأطلق غاز CO₂ بأمان.', 'Vigorous effervescence! Acid reacted with carbonate releasing CO₂ gas safely.'));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من حمض الهيدروكلوريك HCl. انخفضت قيمة pH.`, `Added precisely ${amountMl} mL dilute HCl. pH decreased.`));
+          setLastActionMessage(t(`تمت إضافة ${doseLabelAr} من حمض الهيدروكلوريك HCl. زادت الحموضة وانخفضت قيمة pH.`, `Added ${doseLabelEn} dilute HCl. Acidity increased and pH decreased.`));
         }
       } else if (reagentId === 'base_naoh') {
-        next.baseMl = Math.min(100, next.baseMl + amountMl);
+        next.baseMl = Math.min(500, next.baseMl + amountMl);
         if (next.copperSulfateMl > 0) {
+          playSoundEffect('precipitate');
           next.precipitateG = Math.min(35, next.precipitateG + 4.5);
           setLastActionMessage(t('تفاعل ترسيب! تكوّن راسب أزرق سماوي هلامي من هيدروكسيد النحاس Cu(OH)₂.', 'Precipitation reaction! Sky-blue gelatinous Cu(OH)₂ precipitate formed.'));
         } else {
-          setLastActionMessage(t(`تمت إضافة ${amountMl} مل من هيدروكسيد الصوديوم NaOH. ارتفعت قيمة pH.`, `Added precisely ${amountMl} mL dilute NaOH. pH increased.`));
+          setLastActionMessage(t(`تمت إضافة ${doseLabelAr} من هيدروكسيد الصوديوم NaOH. ارتفعت قيمة pH.`, `Added ${doseLabelEn} dilute NaOH. pH increased.`));
         }
       } else if (reagentId === 'copper_sulfate') {
-        next.copperSulfateMl = Math.min(100, next.copperSulfateMl + amountMl);
-        setLastActionMessage(t(`تمت إضافة ${amountMl} مل من كبريتات النحاس الزرقاء CuSO₄.`, `Added precisely ${amountMl} mL of royal blue CuSO₄ solution.`));
+        next.copperSulfateMl = Math.min(500, next.copperSulfateMl + amountMl);
+        setLastActionMessage(t(`تمت إضافة ${doseLabelAr} من كبريتات النحاس الزرقاء CuSO₄ (ملح حمضي يخفض قيمة pH تدريجياً).`, `Added ${doseLabelEn} of royal blue CuSO₄ solution (acidic salt lowering pH).`));
       } else if (reagentId === 'baking_soda') {
         next.bakingSodaG = Math.min(40, next.bakingSodaG + grams);
-        if (next.acidMl > 0) {
+        if (next.acidMl > 0 || (next.aceticAcidMl || 0) > 0) {
+          playSoundEffect('fizz');
           setEffervescenceBubbles(prevB => Math.min(45, prevB + 30));
           setLastActionMessage(t('فوران فوري وتصاعد فقاعات غاز ثاني أكسيد الكربون (CO₂)!', 'Instant effervescence and CO₂ bubbles streaming upward!'));
         } else {
@@ -792,6 +817,7 @@ export const ExperimentalLab: React.FC = () => {
         }
       } else if (reagentId === 'calcium_chloride') {
         next.calciumChlorideG = Math.min(40, next.calciumChlorideG + grams);
+        playSoundEffect('sizzle');
         setCurrentTempC(prevT => Math.min(88, prevT + grams * 3.5));
         setLastActionMessage(t(`ذوبان ناشر للحرارة (Exothermic)! أُضيف ${grams} جم CaCl₂ وارتفعت الحرارة.`, `Exothermic dissolution! Added ${grams} g CaCl₂ and temperature rose.`));
       } else if (reagentId === 'phenolphthalein') {
@@ -807,6 +833,7 @@ export const ExperimentalLab: React.FC = () => {
       } else if (reagentId === 'iron_filings') {
         next.ironG = Math.min(30, next.ironG + grams);
         if (next.peroxideMl > 0) {
+          playSoundEffect('fizz');
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 30));
           setCurrentTempC(prevT => Math.min(88, prevT + 18));
           setLastActionMessage(t('تحفيز حديدي! قامت برادة الحديد بتفكيك H₂O₂ وتصاعدت فقاعات الأكسجين الساخن.', 'Iron catalysis! Iron filings rapidly catalyzed H₂O₂ into hot oxygen bubbles.'));
@@ -831,6 +858,7 @@ export const ExperimentalLab: React.FC = () => {
           setCurrentTempC(prevT => Math.min(98, prevT + 38));
           setLastActionMessage(t('🔮 ثوران بركاني تحفيزي فائق! برمنغنات البوتاسيوم فككت ماء الأكسجين بعنف مع سحابة أكسجين ساخنة ورغوة بركانية أرجوانية!', '🔮 Dramatic catalytic eruption! KMnO₄ decomposed peroxide with hot oxygen smoke and surging purple foam!'));
         } else if (next.ironG > 0) {
+          playSoundEffect('fizz');
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 35));
           setCurrentTempC(prevT => Math.min(92, prevT + 25));
           setLastActionMessage(t('تفاعل تفكك فوري لماء الأكسجين بفعل المحفز! فقاعات غاز الأكسجين النقي وارتفاع الحرارة.', 'Immediate catalytic peroxide breakdown! Pure O₂ gas foaming and heat surge.'));
@@ -840,6 +868,7 @@ export const ExperimentalLab: React.FC = () => {
       } else if (reagentId === 'silver_nitrate') {
         next.silverNitrateMl = Math.min(100, next.silverNitrateMl + amountMl);
         if (next.acidMl > 0 || next.calciumChlorideG > 0) {
+          playSoundEffect('precipitate');
           next.precipitateG = Math.min(35, next.precipitateG + 4.5);
           setLastActionMessage(t('كشف إيجابي عن أيونات الكلوريد! تكوّن راسب كلوريد الفضة AgCl الأبيض الحليبي.', 'Positive chloride test! Dense milky white silver chloride AgCl precipitate formed.'));
         } else {
@@ -848,6 +877,7 @@ export const ExperimentalLab: React.FC = () => {
       } else if (reagentId === 'ammonia_solution') {
         next.ammoniaMl = Math.min(100, next.ammoniaMl + amountMl);
         if (next.copperSulfateMl > 0) {
+          playSoundEffect('precipitate');
           setLastActionMessage(t('تكوّن معقد النحاس الرباعي الأميني الملكي [Cu(NH₃)₄]²⁺ بلون أزرق نيلي ساحر!', 'Formed royal dark navy tetraamminecopper(II) complex [Cu(NH₃)₄]²⁺!'));
         } else {
           setLastActionMessage(t(`تمت إضافة ${amountMl} مل من محلول الأمونيا NH₄OH (ارتفعت قلوية المحلول pH).`, `Added ${amountMl} mL of ammonia solution NH₄OH (pH increased).`));
@@ -855,7 +885,16 @@ export const ExperimentalLab: React.FC = () => {
       } else if (reagentId === 'sodium_metal') {
         // Metallic Sodium Addition
         if (next.waterMl > 0) {
-          // Instant violent detonation and skittering on water!
+          // Instant violent detonation and skittering on water in both 3D and 2D!
+          playSoundEffect('sizzle');
+          triggerExplosion('sodium');
+          setActiveSkitteringMetal('sodium');
+          if (skitterTimeoutRef.current) clearTimeout(skitterTimeoutRef.current);
+          skitterTimeoutRef.current = window.setTimeout(() => {
+            triggerExplosion('sodium');
+            setActiveSkitteringMetal('none');
+          }, 1600);
+
           const canvas = canvasRef.current;
           const w = canvas ? canvas.width : 460;
           skitteringPelletsRef.current.push({
@@ -878,6 +917,15 @@ export const ExperimentalLab: React.FC = () => {
       } else if (reagentId === 'potassium_metal') {
         // Metallic Potassium Addition (Even more violent than sodium!)
         if (next.waterMl > 0) {
+          playSoundEffect('sizzle');
+          triggerExplosion('potassium');
+          setActiveSkitteringMetal('potassium');
+          if (skitterTimeoutRef.current) clearTimeout(skitterTimeoutRef.current);
+          skitterTimeoutRef.current = window.setTimeout(() => {
+            triggerExplosion('potassium');
+            setActiveSkitteringMetal('none');
+          }, 1400);
+
           const canvas = canvasRef.current;
           const w = canvas ? canvas.width : 460;
           skitteringPelletsRef.current.push({
@@ -908,6 +956,7 @@ export const ExperimentalLab: React.FC = () => {
           setCurrentTempC(prevT => Math.min(99, prevT + 38));
           setLastActionMessage(t('🔥 وميض ساطع مهيب! اشتعل شريط المغنيسيوم بوهج أبيض فائق السطوع يحاكي احتراق الألعاب النارية!', '🔥 Blinding white magnesium combustion flare! Emitted radiant sparks and white MgO ash!'));
         } else if (next.acidMl > 0) {
+          playSoundEffect('fizz');
           next.hydrogenGasMl = Math.min(80, next.hydrogenGasMl + grams * 7);
           setEffervescenceBubbles(prevB => Math.min(60, prevB + 40));
           setCurrentTempC(prevT => Math.min(90, prevT + 18));
@@ -919,13 +968,14 @@ export const ExperimentalLab: React.FC = () => {
         next.ethanolMl = Math.min(100, next.ethanolMl + amountMl);
         setLastActionMessage(t(`تمت إضافة ${amountMl} مل من الإيثانول النقي القابل للاشتعال. استخدم قادح الشرارة أو الموقد لإشعاله!`, `Added ${amountMl} mL flammable pure ethanol. Strike spark to ignite!`));
       } else if (reagentId === 'acetic_acid') {
-        next.aceticAcidMl = (next.aceticAcidMl || 0) + amountMl;
+        next.aceticAcidMl = Math.min(500, (next.aceticAcidMl || 0) + amountMl);
         if (next.bakingSodaG > 0.5) {
+          playSoundEffect('fizz');
           setEffervescenceBubbles(prevB => Math.min(45, prevB + 22));
           next.bakingSodaG = Math.max(0, next.bakingSodaG - amountMl * 0.15);
           setLastActionMessage(t('تفاعل بركاني كلاسيكي ممتع! تفاعل حمض الخليك مع كربونات الصوديوم وتصاعد غاز CO₂.', 'Classic effervescent reaction! Acetic acid effervesced with baking soda releasing CO₂ gas.'));
         } else {
-          setLastActionMessage(t(`أُضيف ${amountMl} مل من حمض الخليك CH₃COOH (حمض ضعيف جزئي التأين).`, `Added ${amountMl} mL dilute acetic acid CH3COOH (weak electrolyte).`));
+          setLastActionMessage(t(`أُضيف ${doseLabelAr} من حمض الخليك CH₃COOH. زادت حموضة المحلول وانخفضت قيمة pH.`, `Added ${doseLabelEn} dilute acetic acid CH3COOH. Acidity increased and pH decreased.`));
         }
       } else if (reagentId === 'strontium_chloride') {
         next.strontiumG = (next.strontiumG || 0) + grams;
@@ -935,6 +985,7 @@ export const ExperimentalLab: React.FC = () => {
         next.bariumG = (next.bariumG || 0) + grams;
         setFlameTestMetal('barium');
         if (next.copperSulfateMl > 0) {
+          playSoundEffect('precipitate');
           next.precipitateG = Math.min(35, next.precipitateG + 6.0);
           setLastActionMessage(t('تفاعل ترسيب تحليلي! تكوّن راسب كبريتات الباريوم BaSO₄ الأبيض غير الذواب، مع انبعاث لهب أخضر تفاحي!', 'Precipitation test! Formed dense white BaSO4 precipitate and enabled apple-green flame!'));
         } else {
@@ -1060,6 +1111,7 @@ export const ExperimentalLab: React.FC = () => {
 
   // Stir the mixture with the authentic glass rod
   const handleStir = () => {
+    playSoundEffect('stir');
     setIsStirring(true);
     setLastActionMessage(
       t(
@@ -1849,13 +1901,221 @@ export const ExperimentalLab: React.FC = () => {
 
       // (d) Dipped Litmus Paper Strip
       if (litmusStripDipped) {
-        const stripX = beakerX + beakerW / 2 + 15;
+        const stripX = beakerX + beakerW / 2 + 28;
+        // Top holder clip
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(stripX - 2, 42, 12, 6);
         // Dry top part
         ctx.fillStyle = '#fef08a';
-        ctx.fillRect(stripX, 35, 8, liquidSurfaceY - 35);
+        const dryH = Math.max(10, (totalVolumeMl > 0 ? liquidSurfaceY : beakerBottomY - 40) - 48);
+        ctx.fillRect(stripX, 48, 8, dryH);
         // Wet dipped part colored according to pH
-        ctx.fillStyle = currentPh < 6 ? '#ef4444' : currentPh > 8 ? '#3b82f6' : '#22c55e';
-        ctx.fillRect(stripX, liquidSurfaceY, 8, beakerBottomY - liquidSurfaceY - 30);
+        if (totalVolumeMl > 0) {
+          ctx.fillStyle = currentPh < 3.5 ? '#ef4444' : currentPh < 6.5 ? '#f97316' : currentPh > 11.0 ? '#7c3aed' : currentPh > 7.5 ? '#2563eb' : '#10b981';
+          ctx.fillRect(stripX, liquidSurfaceY, 8, Math.max(8, beakerBottomY - liquidSurfaceY - 24));
+        }
+      }
+
+      // (e) Electrical Conductivity Tester: Wires, Iron Electrodes & Indicator Bulb (مسبار التوصيل الكهربائي: الأسلاك وقطبا الحديد والمصباح)
+      if (isConductivityActive) {
+        const elec1X = beakerX + 58; // Left Iron Anode (+)
+        const elec2X = beakerX + 96; // Right Iron Cathode (-)
+        const bridgeY = 64;
+        const elecBottomY = beakerBottomY - 20;
+        const bulbX = (elec1X + elec2X) / 2;
+        const bulbY = 30;
+        const activeGlow = totalVolumeMl > 0 ? conductivityGlow : 0;
+
+        ctx.save();
+
+        // 1. Two Iron/Carbon Metallic Electrodes (قطبا الحديد) dipped into the beaker
+        [elec1X, elec2X].forEach((ex, idx) => {
+          const ironGrad = ctx.createLinearGradient(ex - 3, 0, ex + 3, 0);
+          ironGrad.addColorStop(0, '#334155');
+          ironGrad.addColorStop(0.4, '#cbd5e1');
+          ironGrad.addColorStop(0.8, '#475569');
+          ironGrad.addColorStop(1, '#1e293b');
+
+          ctx.fillStyle = ironGrad;
+          ctx.strokeStyle = '#94a3b8';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.roundRect(ex - 3.5, bridgeY + 6, 7, elecBottomY - (bridgeY + 6), [2, 2, 3, 3]);
+          ctx.fill();
+          ctx.stroke();
+
+          // Copper terminal cap at top of each iron rod
+          ctx.fillStyle = idx === 0 ? '#ef4444' : '#3b82f6';
+          ctx.fillRect(ex - 4.5, bridgeY - 4, 9, 6);
+        });
+
+        // 2. Ion flow & electric current arcs between the iron electrodes in conductive solution
+        if (activeGlow > 0.05 && totalVolumeMl > 15) {
+          const arcStartY = Math.max(liquidSurfaceY + 10, bridgeY + 25);
+          const nowTime = Date.now() * 0.008;
+
+          // Glowing current path lines between the two iron rods
+          for (let row = 0; row < 3; row++) {
+            const ay = arcStartY + ((elecBottomY - arcStartY - 8) * (row + 0.5)) / 3;
+            if (ay > liquidSurfaceY + 4 && ay < elecBottomY) {
+              ctx.strokeStyle = `rgba(250, 204, 21, ${Math.min(0.9, activeGlow * 0.85)})`;
+              ctx.lineWidth = 1.6;
+              ctx.beginPath();
+              ctx.moveTo(elec1X + 4, ay);
+              ctx.quadraticCurveTo(
+                (elec1X + elec2X) / 2,
+                ay + Math.sin(nowTime + row * 2) * 5,
+                elec2X - 4,
+                ay
+              );
+              ctx.stroke();
+            }
+          }
+
+          // Micro electrolysis bubbles rising on the iron electrodes
+          for (let b = 0; b < 4; b++) {
+            const by = elecBottomY - ((Date.now() * 0.04 + b * 25) % Math.max(15, elecBottomY - liquidSurfaceY));
+            if (by > liquidSurfaceY) {
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+              ctx.beginPath();
+              ctx.arc(elec1X - 4, by, 1.8, 0, Math.PI * 2);
+              ctx.arc(elec2X + 4, by, 1.8, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+
+        // 3. Insulated Holder Crossbar Bridge
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(elec1X - 12, bridgeY, elec2X - elec1X + 24, 9, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // 4. Insulated Electrical Copper Wires (سلك أحمر موجب وسلك أزرق سالب) connecting rods to bulb
+        // Red wire (+) from left iron electrode to bulb base
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(elec1X, bridgeY - 4);
+        ctx.bezierCurveTo(elec1X - 14, bridgeY - 18, bulbX - 16, bulbY + 18, bulbX - 4, bulbY + 12);
+        ctx.stroke();
+
+        // Blue wire (-) from right iron electrode to bulb base
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.moveTo(elec2X, bridgeY - 4);
+        ctx.bezierCurveTo(elec2X + 14, bridgeY - 18, bulbX + 16, bulbY + 18, bulbX + 4, bulbY + 12);
+        ctx.stroke();
+
+        // 5. Indicator Light Bulb Socket & Glass Bulb
+        // Metallic screw base
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(bulbX - 6, bulbY + 7, 12, 7);
+
+        // Glowing Aura if solution conducts electricity
+        if (activeGlow > 0.05) {
+          const glowRadius = 18 + activeGlow * 22 + Math.sin(Date.now() * 0.02) * 2;
+          const bulbAura = ctx.createRadialGradient(bulbX, bulbY, 2, bulbX, bulbY, glowRadius);
+          bulbAura.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, activeGlow * 1.2)})`);
+          bulbAura.addColorStop(0.35, `rgba(250, 204, 21, ${Math.min(0.95, activeGlow)})`);
+          bulbAura.addColorStop(0.7, `rgba(245, 158, 11, ${activeGlow * 0.45})`);
+          bulbAura.addColorStop(1, 'rgba(245, 158, 11, 0)');
+
+          ctx.fillStyle = bulbAura;
+          ctx.beginPath();
+          ctx.arc(bulbX, bulbY, glowRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Bulb glass sphere
+        ctx.beginPath();
+        ctx.arc(bulbX, bulbY, 10, 0, Math.PI * 2);
+        ctx.fillStyle = activeGlow > 0.05
+          ? `rgba(254, 240, 138, ${0.65 + activeGlow * 0.35})`
+          : 'rgba(148, 163, 184, 0.25)';
+        ctx.strokeStyle = activeGlow > 0.05 ? '#facc15' : '#94a3b8';
+        ctx.lineWidth = 1.6;
+        ctx.fill();
+        ctx.stroke();
+
+        // Tungsten Filament inside bulb
+        ctx.strokeStyle = activeGlow > 0.05 ? '#ffffff' : '#64748b';
+        ctx.lineWidth = activeGlow > 0.05 ? 2.0 : 1.2;
+        ctx.beginPath();
+        ctx.moveTo(bulbX - 3, bulbY + 7);
+        ctx.lineTo(bulbX - 3, bulbY - 2);
+        ctx.lineTo(bulbX, bulbY - 5);
+        ctx.lineTo(bulbX + 3, bulbY - 2);
+        ctx.lineTo(bulbX + 3, bulbY + 7);
+        ctx.stroke();
+
+        // Polarity labels (+ / -)
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = '#f87171';
+        ctx.textAlign = 'center';
+        ctx.fillText('+', elec1X - 10, bridgeY - 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillText('-', elec2X + 10, bridgeY - 2);
+
+        ctx.restore();
+      }
+
+      // (f) Platinum Flame Test Wire Loop in 2D (سلك البلاتين لاختبار اللهب الطيفي)
+      if (flameTestMetal !== 'none') {
+        const flameColors: Record<string, { core: string; outer: string }> = {
+          sodium: { core: '#fef08a', outer: '#f59e0b' },
+          potassium: { core: '#f3e8ff', outer: '#a855f7' },
+          copper: { core: '#bbf7d0', outer: '#10b981' },
+          strontium: { core: '#fecdd3', outer: '#e11d48' },
+          calcium: { core: '#fed7aa', outer: '#ea580c' },
+          barium: { core: '#d9f99d', outer: '#84cc16' },
+          lithium: { core: '#fecdd3', outer: '#f43f5e' }
+        };
+        const spec = flameColors[flameTestMetal] || { core: '#fef08a', outer: '#f59e0b' };
+
+        ctx.save();
+        // Platinum wire rod coming from right into the burner flame zone
+        const loopX = burnerX + 2;
+        const loopY = burnerY - 48;
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(burnerX + 95, burnerY - 22);
+        ctx.lineTo(loopX + 4, loopY);
+        ctx.stroke();
+
+        // Insulated handle
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(burnerX + 95, burnerY - 22);
+        ctx.lineTo(burnerX + 60, burnerY - 32);
+        ctx.stroke();
+
+        // Glowing wire loop tip
+        ctx.strokeStyle = spec.outer;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(loopX, loopY, 4.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Spectral colored flame aura if burner is on
+        if (burnerPower !== 'off') {
+          const specFlicker = Math.sin(Date.now() * 0.025) * 3;
+          const specGrad = ctx.createRadialGradient(loopX, loopY - 8, 2, loopX, loopY - 8, 26);
+          specGrad.addColorStop(0, spec.core);
+          specGrad.addColorStop(0.5, spec.outer);
+          specGrad.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = specGrad;
+          ctx.beginPath();
+          ctx.ellipse(loopX + specFlicker * 0.4, loopY - 8, 16, 24, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
       }
 
       // 7. POURING STREAM & FALLING DROPLETS ANIMATION
@@ -2017,6 +2277,10 @@ export const ExperimentalLab: React.FC = () => {
     isThermometerActive,
     isPhMeterActive,
     litmusStripDipped,
+    isConductivityActive,
+    conductivityGlow,
+    flameTestMetal,
+    isEthanolBurning,
     effervescenceBubbles,
     theme,
     viewMode
@@ -2076,11 +2340,11 @@ export const ExperimentalLab: React.FC = () => {
       {/* Guided Mission Banner when in Guided Mode */}
       {labMode === 'guided' && (
         <div className={`p-4 rounded-2xl border space-y-3 shadow-md ${
-          isDark ? 'bg-slate-900 border-indigo-500/40' : 'bg-white border-indigo-200'
+          isDark ? 'bg-slate-900 border-cyan-500/40' : 'bg-white border-cyan-200'
         }`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-800">
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
+              <Sparkles className="w-5 h-5 text-cyan-400" />
               <h3 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 {t(currentMission.titleAr, currentMission.titleEn)}
               </h3>
@@ -2093,7 +2357,7 @@ export const ExperimentalLab: React.FC = () => {
             )}
           </div>
 
-          <p className="text-xs text-indigo-300 leading-relaxed font-medium">
+          <p className="text-xs text-cyan-300 leading-relaxed font-medium">
             <span className="font-bold text-slate-400">{t('المهمة المطلوبة:', 'Required Task:')} </span>
             {t(currentMission.goalAr, currentMission.goalEn)}
           </p>
@@ -2104,12 +2368,13 @@ export const ExperimentalLab: React.FC = () => {
               <button
                 key={m.id}
                 onClick={() => {
+                  playLabSound('click');
                   setGuidedMissionId(m.id);
                   setMissionComplete(false);
                 }}
                 className={`px-2.5 py-1 rounded-lg border font-bold transition-all whitespace-nowrap ${
                   guidedMissionId === m.id
-                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+                    ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm'
                     : isDark ? 'bg-slate-950 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-700'
                 }`}
               >
@@ -2123,7 +2388,7 @@ export const ExperimentalLab: React.FC = () => {
       {/* MAIN WORKBENCH RESPONSIVE CONTAINER */}
       <div className="w-full flex flex-col md:flex-row gap-5 items-start overflow-x-hidden">
         {/* Left Column: Reagents & Safe Chemical Shelf */}
-        <div className="w-full md:w-[320px] lg:w-[360px] shrink-0 flex flex-col gap-4 order-2 md:order-1">
+        <div className="w-full md:w-[300px] lg:w-[330px] xl:w-[350px] shrink-0 min-w-0 flex flex-col gap-4 order-2 md:order-1">
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -2315,15 +2580,15 @@ export const ExperimentalLab: React.FC = () => {
             </div>
 
             {/* Chemical Reagents Shelf Buttons */}
-            <div className="space-y-2 max-h-[460px] overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-[460px] overflow-y-auto overflow-x-hidden pr-1">
               {REAGENTS.map(r => (
                 <div
                   key={r.id}
-                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 transition-all ${
+                  className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all min-w-0 ${
                     isDark ? 'bg-slate-950/50 border-slate-800 hover:border-cyan-600/40' : 'bg-slate-50 border-slate-200 hover:border-cyan-400'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-mono font-black border shrink-0"
                       style={{
@@ -2334,12 +2599,12 @@ export const ExperimentalLab: React.FC = () => {
                     >
                       {r.formula.split(' ')[0].substring(0, 3)}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                           {t(r.nameAr, r.nameEn)}
                         </span>
-                        <span className="text-[10px] font-mono text-cyan-400 font-semibold">({r.formula})</span>
+                        <span className="text-[10px] font-mono text-cyan-400 font-semibold shrink-0">({r.formula})</span>
                       </div>
                       <p className="text-[10px] text-slate-400 leading-tight mt-0.5 line-clamp-1">
                         {t(r.descAr, r.descEn)}
@@ -2350,11 +2615,11 @@ export const ExperimentalLab: React.FC = () => {
                   <div className="flex items-center gap-1 shrink-0">
                     {r.type === 'liquid' && (
                       <button
-                        onClick={() => handleAddReagent(r.id, 1)}
+                        onClick={() => handleAddReagent(r.id, dispenseMode === 'drop' ? 0.6 : 1)}
                         className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-[11px] font-bold shrink-0 transition-all hover:border-cyan-500/50"
-                        title={t('إضافة 1 مليلتر بالضبط', 'Add exactly 1 mL')}
+                        title={dispenseMode === 'drop' ? t('إضافة قطرة واحدة (0.6 مل)', 'Add 1 drop (0.6 mL)') : t('إضافة 1 مليلتر بالضبط', 'Add exactly 1 mL')}
                       >
-                        +1 ml
+                        {dispenseMode === 'drop' ? `+1 ${t('قطرة', 'drop')}` : '+1 ml'}
                       </button>
                     )}
                     {r.type === 'indicator' && (
@@ -2390,36 +2655,41 @@ export const ExperimentalLab: React.FC = () => {
         </div>
 
         {/* Main Simulation Stage & Instruments */}
-        <div className="w-full flex-1 min-w-0 flex flex-col lg:flex-row gap-5 order-1 md:order-2">
+        <div className="w-full flex-1 min-w-0 flex flex-col xl:flex-row gap-5 order-1 md:order-2">
           {/* Middle Column: Interactive Beaker Workbench & Real-time Canvas */}
-          <div className="w-full lg:flex-1 flex flex-col gap-4 items-center">
-          <div className={`w-full p-4 rounded-2xl border shadow-lg flex flex-col items-center relative ${
+          <div className="w-full xl:flex-1 min-w-0 flex flex-col gap-4 items-center">
+          <div className={`w-full min-w-0 p-4 rounded-2xl border shadow-lg flex flex-col items-center relative ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
             {/* Viewport Dimension Mode Selector (3D / 2D / Split View) */}
             <div className="w-full flex items-center justify-between pb-2 mb-3 border-b border-slate-800 gap-2 flex-wrap">
-              <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-1 p-1 bg-slate-950/80 border border-slate-800 rounded-xl shadow-inner">
                 <button
-                  onClick={() => setViewMode('3d')}
+                  onClick={() => {
+                    playLabSound('click');
+                    setViewMode('3d');
+                  }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     viewMode === '3d'
                       ? 'bg-cyan-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <Box className="w-3.5 h-3.5" />
-                  <span>{t('معمل ثلاثي الأبعاد (3D)', '3D Virtual Lab')}</span>
+                  <Box className="w-3.5 h-3.5 text-cyan-300" />
+                  <span>{t('مجسم 3D', '3D Model')}</span>
                 </button>
                 <button
-                  onClick={() => setViewMode('2d')}
+                  onClick={() => {
+                    playLabSound('click');
+                    setViewMode('2d');
+                  }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     viewMode === '2d'
                       ? 'bg-cyan-600 text-white shadow-md'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <FlaskConical className="w-3.5 h-3.5" />
-                  <span>{t('المخطط المخبري (2D)', '2D Canvas')}</span>
+                  <span>{t('مخطط 2D', '2D View')}</span>
                 </button>
               </div>
 
@@ -2499,7 +2769,15 @@ export const ExperimentalLab: React.FC = () => {
                     burnerPower={burnerPower}
                     isStirring={isStirring}
                     isThermometerActive={isThermometerActive}
-                    precipitateG={content.precipitateG}
+                    precipitateG={
+                      content.precipitateG +
+                      content.ironG +
+                      content.bakingSodaG * 0.6 +
+                      content.calciumChlorideG * 0.5 +
+                      content.permanganateG * 0.4 +
+                      (content.strontiumG || 0) * 0.5 +
+                      (content.bariumG || 0) * 0.5
+                    }
                     effervescenceBubbles={effervescenceBubbles}
                     isConductivityActive={isConductivityActive}
                     conductivityGlow={conductivityGlow}
@@ -2509,8 +2787,18 @@ export const ExperimentalLab: React.FC = () => {
                     litmusStripDipped={litmusStripDipped}
                     hydrogenGasMl={content.hydrogenGasMl}
                     dispenseTrigger={dispenseAnimCounter}
+                    dispenseInfo={dispenseInfo}
+                    explosionEvent={explosionEvent3D}
                     iceCount={content.iceCount}
-                    hasActiveMetal={content.sodiumG > 0 ? 'sodium' : content.potassiumG > 0 ? 'potassium' : 'none'}
+                    hasActiveMetal={
+                      activeSkitteringMetal !== 'none'
+                        ? activeSkitteringMetal
+                        : content.sodiumG > 0
+                        ? 'sodium'
+                        : content.potassiumG > 0
+                        ? 'potassium'
+                        : 'none'
+                    }
                     hasMagnesiumRibbon={content.magnesiumG > 0}
                     precipitateType={
                       content.silverNitrateMl > 0 && (content.acidMl > 0 || content.calciumChlorideG > 0)
@@ -2521,8 +2809,13 @@ export const ExperimentalLab: React.FC = () => {
                         ? 'barium_sulfate'
                         : content.ironG > 0
                         ? 'iron'
+                        : content.permanganateG > 0
+                        ? 'permanganate'
+                        : content.bakingSodaG > 0 || content.calciumChlorideG > 0 || content.strontiumG > 0 || content.bariumG > 0
+                        ? 'white_salt'
                         : 'none'
                     }
+                    lastActionMessage={lastActionMessage}
                   />
                 </div>
               ) : (
@@ -2570,6 +2863,33 @@ export const ExperimentalLab: React.FC = () => {
                   onClick={() => {
                     const next = burnerPower === 'off' ? 'med' : burnerPower === 'med' ? 'high' : burnerPower === 'high' ? 'low' : 'off';
                     setBurnerPower(next);
+                    if (next !== 'off') {
+                      playSoundEffect('burner_on');
+                      if (content.magnesiumG > 0) {
+                        setTimeout(() => {
+                          triggerExplosion('magnesium');
+                          setContent(prev => ({
+                            ...prev,
+                            magnesiumG: 0,
+                            precipitateG: Math.min(35, prev.precipitateG + 4.0)
+                          }));
+                          setCurrentTempC(prevT => Math.min(99, prevT + 36));
+                          setLastActionMessage(t('🔥 وميض أبيض ناصع باهر! أشعل موقد بنزن شريط المغنيسيوم بالوهج الشمسي الأبيض الناصع!', '🔥 Blinding white flare! Bunsen burner ignited magnesium ribbon into radiant sparks and white MgO ash!'));
+                        }, 200);
+                        return;
+                      }
+                      if (content.ethanolMl > 0 && !isEthanolBurning) {
+                        setTimeout(() => {
+                          triggerExplosion('ethanol_fire');
+                          setIsEthanolBurning(true);
+                          setCurrentTempC(prevT => Math.min(99, prevT + 25));
+                          setLastActionMessage(t('🔥 اشتعل الإيثانول بفعل حرارة الموقد بلهب أزرق وأصفر مستمر!', '🔥 Burner ignited ethanol into a steady blue-orange alcohol combustion flame!'));
+                        }, 200);
+                        return;
+                      }
+                    } else {
+                      playSoundEffect('click');
+                    }
                     setLastActionMessage(t(`تم ضبط الموقد على: ${next === 'off' ? 'مغلق' : next}`, `Burner set to: ${next}`));
                   }}
                   className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
@@ -2623,6 +2943,7 @@ export const ExperimentalLab: React.FC = () => {
                 <span className="text-[10px] text-slate-400 font-bold block">{t('التوصيل الكهربائي:', 'Conductivity Probe:')}</span>
                 <button
                   onClick={() => {
+                    playSoundEffect(!isConductivityActive ? 'spark' : 'click');
                     setIsConductivityActive(!isConductivityActive);
                     setLastActionMessage(
                       !isConductivityActive
@@ -2673,6 +2994,7 @@ export const ExperimentalLab: React.FC = () => {
                         <button
                           key={m.id}
                           onClick={() => {
+                            playSoundEffect('burner_on');
                             setFlameTestMetal(m.id);
                             if (burnerPower === 'off') setBurnerPower('med');
                             setIsFlameTestSelectorOpen(false);
@@ -2704,6 +3026,7 @@ export const ExperimentalLab: React.FC = () => {
                 <span className="text-[10px] text-slate-400 font-bold block">{t('شريط كاشف تباع الشمس:', 'Litmus Strip:')}</span>
                 <button
                   onClick={() => {
+                    playSoundEffect('drop');
                     setLitmusStripDipped(!litmusStripDipped);
                     setLastActionMessage(t('تم غمس شريط كاشف تباع الشمس لمعاينة تغير اللون الكيميائي.', 'Dipped litmus strip to observe color change.'));
                   }}
@@ -2723,6 +3046,7 @@ export const ExperimentalLab: React.FC = () => {
                 <span className="text-[10px] text-slate-400 font-bold block">{t('الميزان الرقمي:', 'Electronic Scale:')}</span>
                 <button
                   onClick={() => {
+                    playSoundEffect('click');
                     setBalanceTare(rawMassG);
                     setLastActionMessage(t('تم تصفير الميزان الرقمي (Tare) لقياس المادة المضافة بدقة.', 'Scale tared to zero to measure added substances precisely.'));
                   }}
@@ -2741,7 +3065,7 @@ export const ExperimentalLab: React.FC = () => {
         </div>
 
           {/* Right Column: Precision Instruments (pH Meter, Thermometer, Balance) */}
-          <div className="w-full lg:w-[320px] shrink-0 flex flex-col gap-4">
+          <div className="w-full xl:w-[300px] shrink-0 min-w-0 grid grid-cols-1 sm:grid-cols-3 xl:flex xl:flex-col gap-4">
           {/* Digital pH Meter Card */}
           <div className={`p-4 sm:p-5 rounded-2xl border space-y-3 shadow-lg ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'

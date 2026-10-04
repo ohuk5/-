@@ -17,6 +17,13 @@ function MainAppContent() {
   const [isGuideOpen, setIsGuideOpen] = useState<boolean>(false);
   const [guideCategory, setGuideCategory] = useState<'basics' | 'states' | 'atoms' | 'decay' | 'missions'>('basics');
 
+  React.useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeTab]);
+
   const handleOpenGuide = (category?: 'basics' | 'states' | 'atoms' | 'decay' | 'missions') => {
     if (category) {
       setGuideCategory(category);
