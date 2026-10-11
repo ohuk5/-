@@ -46,7 +46,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [showSpinArrows, setShowSpinArrows] = useState<boolean>(true);
   const [orbitSpeed, setOrbitSpeed] = useState<number>(1.0); // 0 (pause), 0.3 (slow motion), 1.0 (normal), 1.6 (fast)
-  const [dimensionMode, setDimensionMode] = useState<'3d' | '2d'>('3d');
+  const [dimensionMode, setDimensionMode] = useState<'3d' | '2d'>('2d');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const nucleusNodesRef = useRef<NucleusNode[]>([]);
@@ -991,6 +991,18 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             <div className="w-full flex items-center justify-between mb-3 px-1 gap-2 flex-wrap">
               <div className="flex items-center gap-1 p-1 bg-slate-950/80 border border-slate-800 rounded-xl shadow-inner">
                 <button
+                  onClick={() => setDimensionMode('2d')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    dimensionMode === '2d'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={t('مخطط مستويات الطاقة ومستويات بور المستوية 2D', '2D Bohr energy shell diagram')}
+                >
+                  <span>{t('مخطط بور 2D', '2D Bohr')}</span>
+                </button>
+
+                <button
                   onClick={() => setDimensionMode('3d')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     dimensionMode === '3d'
@@ -1001,18 +1013,6 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
                 >
                   <Box className="w-3.5 h-3.5 text-cyan-300" />
                   <span>{t('مجسم 3D', '3D Model')}</span>
-                </button>
-
-                <button
-                  onClick={() => setDimensionMode('2d')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    dimensionMode === '2d'
-                      ? 'bg-cyan-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title={t('مخطط مستويات الطاقة ومستويات بور المستوية 2D', '2D Bohr energy shell diagram')}
-                >
-                  <span>{t('مخطط بور 2D', '2D Bohr')}</span>
                 </button>
               </div>
 

@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
         <div className="flex items-center justify-between w-full xl:w-auto gap-3 min-w-0">
           <button
             type="button"
-            onClick={() => setActiveTab('states-of-matter')}
+            onClick={() => setActiveTab('atom-builder')}
             className="flex items-center gap-2.5 min-w-0 text-start group focus:outline-none"
           >
             <div className="w-9 h-9 rounded-xl bg-cyan-600 flex items-center justify-center text-white shadow-xs shrink-0 group-hover:bg-cyan-500 transition-colors">

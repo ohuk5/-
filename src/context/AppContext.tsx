@@ -52,7 +52,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved === null ? true : saved === 'true';
   });
 
-  const [activeTab, setActiveTabState] = useState<ActiveTabType>('states-of-matter');
+  const [activeTab, setActiveTabState] = useState<ActiveTabType>('atom-builder');
   const [activeLabPreset, setActiveLabPreset] = useState<LabExperimentTrigger | null>(null);
 
   useEffect(() => {

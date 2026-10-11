@@ -484,6 +484,8 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
     const particlesPerLayer = Math.ceil(count / latticeLayers);
     const side = Math.ceil(Math.sqrt(particlesPerLayer));
     const spacing = 1.32;
+    const initPhase = liveStateRef.current.phase;
+    const maxInitY = Math.max(floorY + 2.5, pistonLidY - 0.9);
 
     for (let i = 0; i < count; i++) {
       const { mesh, radius: pRadius } = createSubstanceMesh();
@@ -498,9 +500,32 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
       const targetLy = floorY + layer * (spacing * 0.92) + 0.5;
       const targetLz = (row - (side - 1) / 2) * spacing;
 
-      const initX = targetLx + (Math.random() - 0.5) * 0.15;
-      const initY = targetLy;
-      const initZ = targetLz + (Math.random() - 0.5) * 0.15;
+      let initX = targetLx + (Math.random() - 0.5) * 0.15;
+      let initY = targetLy;
+      let initZ = targetLz + (Math.random() - 0.5) * 0.15;
+
+      // Isotropic 3D random unit vector for initial velocity
+      const u = Math.random() * 2 - 1;
+      const phiAng = Math.random() * Math.PI * 2;
+      const sqrtOneMinusU2 = Math.sqrt(Math.max(0, 1 - u * u));
+      const dirX = sqrtOneMinusU2 * Math.cos(phiAng);
+      const dirY = u;
+      const dirZ = sqrtOneMinusU2 * Math.sin(phiAng);
+      const initSpeed = initPhase === 'gas' || initPhase === 'boiling' ? 0.18 + Math.random() * 0.06 : 0.08;
+
+      if (initPhase === 'gas' || initPhase === 'boiling') {
+        const r = Math.sqrt(Math.random()) * (chamberRadius * 0.76);
+        const thetaAng = Math.random() * Math.PI * 2;
+        initX = r * Math.cos(thetaAng);
+        initZ = r * Math.sin(thetaAng);
+        initY = floorY + 0.5 + Math.random() * Math.max(1.5, maxInitY - floorY - 0.8);
+      } else if (initPhase === 'liquid') {
+        const r = Math.sqrt(Math.random()) * (chamberRadius * 0.65);
+        const thetaAng = Math.random() * Math.PI * 2;
+        initX = r * Math.cos(thetaAng);
+        initZ = r * Math.sin(thetaAng);
+        initY = floorY + Math.random() * 2.4;
+      }
 
       mesh.position.set(initX, initY, initZ);
 
@@ -509,9 +534,9 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         x: initX,
         y: initY,
         z: initZ,
-        vx: (Math.random() - 0.5) * 0.12,
-        vy: (Math.random() - 0.5) * 0.12,
-        vz: (Math.random() - 0.5) * 0.12,
+        vx: dirX * initSpeed,
+        vy: dirY * initSpeed,
+        vz: dirZ * initSpeed,
         radius: pRadius,
         targetLatticeX: targetLx,
         targetLatticeY: targetLy,
@@ -529,6 +554,7 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
 
     // Animation & 3D Physics Loop
     let time = 0;
+    let lastSimPhase = liveStateRef.current.phase;
     const animate = () => {
       time += 0.02;
 
@@ -584,6 +610,27 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
       const radiusBound = chamberRadius * 0.86;
       const bottomBound = 1.5;
       const topBound = Math.max(bottomBound + 1.4, currentPistonY - 0.65);
+
+      // Relative thermal speed for Gas phase calibrated to substance's boiling point & molecular mass
+      // so cryogenic gases (He, Ne, N2, O2) and hot vapors (H2O, Fe) both fly naturally in 3D!
+      const tbRef = Math.max(4.0, substance.boilingPointK);
+      const gasTempRatio = Math.max(1.0, curTemp / tbRef);
+      const massSpeedFactor = Math.max(0.78, Math.min(1.35, Math.pow(28 / Math.max(4, substance.mass), 0.18)));
+      const targetGasSpeed = Math.min(0.32, Math.max(0.15, 0.17 * Math.sqrt(Math.min(3.8, gasTempRatio)) * massSpeedFactor));
+
+      // When transitioning into gas/boiling from a condensed phase, give particles an immediate 3D expansion kick
+      if ((curPhase === 'gas' || curPhase === 'boiling') && lastSimPhase !== 'gas' && lastSimPhase !== 'boiling') {
+        for (let i = 0; i < n; i++) {
+          const p = particles[i];
+          const u = Math.random() * 2 - 1;
+          const phiAng = Math.random() * Math.PI * 2;
+          const s = Math.sqrt(Math.max(0, 1 - u * u));
+          p.vx = s * Math.cos(phiAng) * targetGasSpeed;
+          p.vy = (Math.abs(u) * 0.75 + 0.25) * targetGasSpeed;
+          p.vz = s * Math.sin(phiAng) * targetGasSpeed;
+        }
+      }
+      lastSimPhase = curPhase;
 
       // Compute 3D Center of Mass for Zero-G Surface Tension Cohesion
       let comX = 0;
@@ -674,15 +721,21 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
           p.y += p.vy;
           p.z += p.vz;
         } else {
-          // Gas / Boiling: Energetic 3D Maxwell-Boltzmann flight + piston work
-          p.vx += (Math.random() - 0.5) * 0.035;
-          p.vy += (Math.random() - 0.5) * 0.035 - curGrav * 0.012 + (curPhase === 'boiling' ? 0.02 : 0);
-          p.vz += (Math.random() - 0.5) * 0.035;
+          // Gas / Boiling: Clean straight-line 3D ballistic flight (Kinetic Theory of Gases)
+          // No mid-air random jitter and no excessive gravity pinning molecules to the floor!
+          if (curPhase === 'boiling' && p.y < bottomBound + 2.0) {
+            p.vy += 0.012;
+          } else if (curGrav > 0.01) {
+            p.vy -= curGrav * 0.0004;
+          }
+
+          // Ensure every gas molecule has a healthy 3D vertical velocity component so it traverses the full chamber height
+          if (Math.abs(p.vy) < targetGasSpeed * 0.22) {
+            p.vy = (p.vy >= 0 ? 1 : -1) * targetGasSpeed * (0.35 + Math.random() * 0.25);
+          }
 
           const currentSpeed = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz) || 0.01;
-          const targetSpeed = Math.max(0.06, speedScale * 2.6);
-          const blend = 0.15;
-          const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * blend;
+          const newSpeed = currentSpeed + (targetGasSpeed - currentSpeed) * 0.12;
           p.vx = (p.vx / currentSpeed) * newSpeed;
           p.vy = (p.vy / currentSpeed) * newSpeed;
           p.vz = (p.vz / currentSpeed) * newSpeed;
@@ -703,16 +756,32 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
           // Reflect velocity vector off cylindrical normal
           const dot = p.vx * nx + p.vz * nz;
           if (dot > 0) {
-            const restitution = curPhase === 'gas' || curPhase === 'boiling' ? 0.98 : 0.6;
+            const isGasLike = curPhase === 'gas' || curPhase === 'boiling';
+            const restitution = isGasLike ? 1.0 : 0.6;
             p.vx -= (1 + restitution) * dot * nx;
             p.vz -= (1 + restitution) * dot * nz;
+
+            // Slight diffuse reflection in gas phase prevents molecules from orbiting the circular wall
+            if (isGasLike) {
+              const angleJitter = (Math.random() - 0.5) * 0.22;
+              const cosA = Math.cos(angleJitter);
+              const sinA = Math.sin(angleJitter);
+              const rvx = p.vx * cosA - p.vz * sinA;
+              const rvz = p.vx * sinA + p.vz * cosA;
+              p.vx = rvx;
+              p.vz = rvz;
+            }
           }
         }
 
         // Floor Collision
         if (p.y < bottomBound) {
           p.y = bottomBound;
-          p.vy = Math.abs(p.vy) * (curPhase === 'gas' || curPhase === 'boiling' ? 0.96 : 0.45);
+          if (curPhase === 'gas' || curPhase === 'boiling') {
+            p.vy = Math.max(targetGasSpeed * 0.45, Math.abs(p.vy) * 0.99);
+          } else {
+            p.vy = Math.abs(p.vy) * 0.45;
+          }
         }
 
         // Liquid meniscus ceiling when under gravity
@@ -727,7 +796,11 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         // Movable Piston Lid Collision (with momentum transfer from moving piston!)
         if (p.y > topBound) {
           p.y = topBound;
-          p.vy = -Math.abs(p.vy) * 0.92 + Math.min(0, pistonVelY * 1.2);
+          if (curPhase === 'gas' || curPhase === 'boiling') {
+            p.vy = -Math.max(targetGasSpeed * 0.45, Math.abs(p.vy) * 0.99) + Math.min(0, pistonVelY * 1.2);
+          } else {
+            p.vy = -Math.abs(p.vy) * 0.85 + Math.min(0, pistonVelY * 1.2);
+          }
         }
       }
 
@@ -760,7 +833,8 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
               const dvx = p1.vx - p2.vx;
               const dvy = p1.vy - p2.vy;
               const dvz = p1.vz - p2.vz;
-              const impulse = (dvx * nx + dvy * ny + dvz * nz) * 0.85;
+              const elasticity = curPhase === 'gas' || curPhase === 'boiling' ? 1.0 : 0.85;
+              const impulse = (dvx * nx + dvy * ny + dvz * nz) * elasticity;
               if (impulse > 0) {
                 p1.vx -= impulse * nx;
                 p1.vy -= impulse * ny;

@@ -48,7 +48,9 @@ export type LabSoundType =
   | 'click'
   | 'geiger'
   | 'nucleon'
-  | 'success';
+  | 'success'
+  | 'crystallize'
+  | 'inflate';
 
 export function playLabSound(type: LabSoundType, muted: boolean = false): void {
   if (muted || !globalSoundEnabled) return;
@@ -502,6 +504,35 @@ export function playLabSound(type: LabSoundType, muted: boolean = false): void {
         osc.start(start);
         osc.stop(start + 0.34);
       });
+    } else if (type === 'crystallize') {
+      // Shimmering crystalline lattice formation chime
+      [1046.5, 1318.5, 1567.98, 2093.0, 2637.0].forEach((f, idx) => {
+        const start = now + idx * 0.055;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, start);
+        osc.frequency.exponentialRampToValueAtTime(f * 1.03, start + 0.25);
+        gain.gain.setValueAtTime(0.16, start);
+        gain.gain.exponentialRampToValueAtTime(0.003, start + 0.28);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + 0.30);
+      });
+    } else if (type === 'inflate') {
+      // Rubber balloon stretching + gas expansion whoosh
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(460, now + 0.32);
+      gain.gain.setValueAtTime(0.24, now);
+      gain.gain.exponentialRampToValueAtTime(0.005, now + 0.36);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.38);
     }
   } catch {
     // Ignore audio context errors on restricted devices

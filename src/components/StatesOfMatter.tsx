@@ -64,7 +64,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
   const [pressureAtm, setPressureAtm] = useState<number>(1.02);
   const [burnerActive, setBurnerActive] = useState<'heat' | 'cool' | null>(null);
   const [isVenting, setIsVenting] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'3d' | '2d'>('3d'); // 3D or 2D mode
+  const [viewMode, setViewMode] = useState<'3d' | '2d'>('2d'); // 2D default mode
 
   // Exact Temperature Input State (as requested by user)
   const [tempUnit, setTempUnit] = useState<'K' | 'C'>('K');
@@ -89,8 +89,44 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
   const substance: SubstanceInfo = SUBSTANCES[substanceId] || SUBSTANCES['water'];
   const phaseInfo = calculatePhase(actualTemp, substance, pressureAtm, lang);
 
-  // Dynamic Scale bounds for the temperature bar (supports high temp for Iron and Gold!)
-  const maxScaleK = Math.max(1200, Math.ceil(substance.boilingPointK * 1.35 / 50) * 50);
+  // Dynamic Scale bounds for the temperature bar tailored accurately to each substance
+  const maxScaleK =
+    substance.boilingPointK < 40
+      ? 120
+      : substance.boilingPointK < 150
+      ? 300
+      : substance.boilingPointK <= 450
+      ? 600
+      : substance.boilingPointK <= 900
+      ? 1000
+      : Math.ceil((substance.boilingPointK * 1.3) / 100) * 100;
+
+  const isSublimatingNow = Boolean(substance.isSublimating && pressureAtm < 5.1);
+
+  // Piecewise-exact needle percentage so the needle ALWAYS matches the Solid / Liquid / Gas zones & Tm / Tb borders 100%
+  const phaseRulerNeedlePct = (() => {
+    const tm = Math.max(0.5, phaseInfo.effectiveTm);
+    const tb = Math.max(tm + 0.5, phaseInfo.effectiveTb);
+    if (isSublimatingNow) {
+      if (actualTemp <= tm) {
+        return Math.max(1, Math.min(50, (actualTemp / tm) * 50));
+      }
+      return Math.max(50, Math.min(99, 50 + ((actualTemp - tm) / Math.max(1, maxScaleK - tm)) * 50));
+    }
+    if (actualTemp <= tm) {
+      return Math.max(1, Math.min(33.3333, (actualTemp / tm) * 33.3333));
+    }
+    if (actualTemp <= tb) {
+      return Math.max(
+        33.3333,
+        Math.min(66.6667, 33.3333 + ((actualTemp - tm) / Math.max(0.1, tb - tm)) * 33.3333)
+      );
+    }
+    return Math.max(
+      66.6667,
+      Math.min(99, 66.6667 + ((actualTemp - tb) / Math.max(1, maxScaleK - tb)) * 33.3333)
+    );
+  })();
 
   // Sync exact input box when targetTemp or tempUnit changes
   useEffect(() => {
@@ -553,6 +589,25 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
       ctx.lineTo(rightWall, lidY);
       ctx.stroke();
 
+      // Volume Graduation Ruler Ticks on Right Vessel Wall (aligned with lidY formula)
+      ctx.save();
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'right';
+      [25, 50, 75, 100].forEach(vPct => {
+        const tickY = 40 + ((100 - vPct) * (h - 100)) / 100;
+        if (tickY >= lidY - 2 && tickY <= bottomWall) {
+          ctx.strokeStyle = theme === 'dark' ? 'rgba(56, 189, 248, 0.45)' : 'rgba(2, 132, 199, 0.45)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(rightWall - 8, tickY);
+          ctx.lineTo(rightWall - 1, tickY);
+          ctx.stroke();
+          ctx.fillStyle = theme === 'dark' ? 'rgba(148, 163, 184, 0.75)' : 'rgba(71, 85, 105, 0.8)';
+          ctx.fillText(`${vPct}%`, rightWall - 11, tickY + 3);
+        }
+      });
+      ctx.restore();
+
       // Movable Piston / Lid
       ctx.fillStyle = theme === 'dark' ? '#1e293b' : '#cbd5e1';
       ctx.fillRect(leftWall - 4, lidY - 14, rightWall - leftWall + 8, 14);
@@ -954,13 +1009,31 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
     setTargetTemp(Math.round(tVal));
   };
 
-  // Interactive Click on the Temperature Ruler
+  // Interactive Click on the Temperature Ruler (Piecewise-aligned with Solid / Liquid / Gas zones)
   const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-    const newTemp = Math.round(ratio * maxScaleK);
-    setTargetTemp(Math.max(5, newTemp));
+    const tm = Math.max(0.5, phaseInfo.effectiveTm);
+    const tb = Math.max(tm + 0.5, phaseInfo.effectiveTb);
+
+    let newTemp: number;
+    if (isSublimatingNow) {
+      if (ratio <= 0.5) {
+        newTemp = (ratio / 0.5) * tm;
+      } else {
+        newTemp = tm + ((ratio - 0.5) / 0.5) * (maxScaleK - tm);
+      }
+    } else {
+      if (ratio <= 1 / 3) {
+        newTemp = ratio * 3 * tm;
+      } else if (ratio <= 2 / 3) {
+        newTemp = tm + (ratio - 1 / 3) * 3 * (tb - tm);
+      } else {
+        newTemp = tb + (ratio - 2 / 3) * 3 * (maxScaleK - tb);
+      }
+    }
+    setTargetTemp(Math.max(2, Math.min(maxScaleK, Math.round(newTemp))));
   };
 
   const runExperiment = (exp: 'space_drop' | 'pressure_cooker' | 'co2_sublime' | 'mercury_liquid' | 'gold_melt' | 'bromine_vapor') => {
@@ -1293,21 +1366,24 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                 <span className="text-slate-400 font-medium">{t('تسارع الجاذبية المستمر (g):', 'Continuous Gravity (g):')}</span>
                 <span className="font-mono text-cyan-300 font-bold">{(gravityValue * 9.8).toFixed(1)} m/s²</span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="300"
-                value={Math.round(gravityValue * 100)}
-                onChange={(e) => {
-                  setGravityValue(parseInt(e.target.value) / 100);
-                  setGravityPreset('earth');
-                }}
-                className="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                <span>0.0 g</span>
-                <span>1.0 g</span>
-                <span>3.0 g</span>
+              <div dir="ltr" className="space-y-1">
+                <input
+                  type="range"
+                  min="0"
+                  max="300"
+                  value={Math.round(gravityValue * 100)}
+                  onChange={(e) => {
+                    setGravityValue(parseInt(e.target.value) / 100);
+                    setGravityPreset('earth');
+                  }}
+                  className="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer accent-cyan-400"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>0.0 g</span>
+                  <span>1.0 g</span>
+                  <span>2.0 g</span>
+                  <span>3.0 g</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1363,6 +1439,21 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                   type="button"
                   onClick={() => {
                     playLabSound('click');
+                    setViewMode('2d');
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    viewMode === '2d'
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={t('مخطط ثنائي الأبعاد 2D', '2D Canvas View')}
+                >
+                  <span>{t('مخطط 2D', '2D View')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playLabSound('click');
                     setViewMode('3d');
                   }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -1374,21 +1465,6 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                 >
                   <Box className="w-3.5 h-3.5 text-cyan-300" />
                   <span>{t('مجسم 3D', '3D Model')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    playLabSound('click');
-                    setViewMode('2d');
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    viewMode === '2d'
-                      ? 'bg-cyan-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                  title={t('مخطط ثنائي الأبعاد 2D', '2D Canvas View')}
-                >
-                  <span>{t('مخطط 2D', '2D View')}</span>
                 </button>
               </div>
 
@@ -1466,8 +1542,8 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                 </div>
               </div>
 
-              {/* Smooth Range Slider */}
-              <div className="flex items-center gap-3">
+              {/* Smooth Range Slider (LTR aligned so 20%..100% ticks match thumb position 100%) */}
+              <div dir="ltr" className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => applyAdiabaticVolumeChange(Math.max(20, volumeLidPercent - 5))}
@@ -1489,10 +1565,11 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                     className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
                   />
                   <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                    <span>20% ({t('أقصى كبس', 'Max')})</span>
-                    <span>50%</span>
-                    <span>75% ({t('عادي', 'Normal')})</span>
-                    <span>100% ({t('مفرغ', 'Vacuum')})</span>
+                    <span>20% ({t('كبس', 'Min')})</span>
+                    <span>40%</span>
+                    <span>60%</span>
+                    <span>80%</span>
+                    <span>100% ({t('أقصى حجم', 'Max')})</span>
                   </div>
                 </div>
 
@@ -1583,70 +1660,134 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
             </div>
           </div>
 
-          {/* TEMPERATURE PHASE DIAGRAM RULER (ALIGNED!) */}
+          {/* TEMPERATURE PHASE DIAGRAM RULER (100% PIECEWISE-ALIGNED WITH SOLID / LIQUID / GAS!) */}
           <div className={`w-full p-4 rounded-2xl border shadow-lg space-y-2.5 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
             <div className="flex justify-between items-center text-xs font-semibold text-slate-400">
               <span className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>{t('مقياس أطوار المادة (انقر لتحديد الحرارة):', 'Phase Diagram Scale (Click to set):')}</span>
+                <span>{t('مقياس أطوار المادة الدقيق (انقر على أي طور لضبط الحرارة):', 'Precision Phase Diagram Scale (Click any phase to set temp):')}</span>
               </span>
-              <span className="font-mono text-cyan-400 font-bold">{actualTemp.toFixed(1)} K</span>
+              <span className="font-mono text-cyan-400 font-bold">
+                {actualTemp.toFixed(1)} K ({(actualTemp - 273.15).toFixed(1)} °C)
+              </span>
             </div>
 
-            {/* Visual Ruler Bar: Always LTR so 0 K is Left and High Temp is Right */}
+            {/* Visual Ruler Bar: Piecewise-mapped so Solid (0..Tm), Liquid (Tm..Tb), Gas (Tb..Max) match the needle 100% */}
             <div
               dir="ltr"
               onClick={handleRulerClick}
-              className="relative h-8 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center text-[11px] font-bold text-center cursor-pointer select-none"
+              className="relative h-9 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center text-[11px] font-bold text-center cursor-pointer select-none shadow-inner"
             >
-              {/* Solid Zone (0 K to Tm) */}
-              <div
-                style={{
-                  width: `${Math.min(50, Math.max(12, (phaseInfo.effectiveTm / maxScaleK) * 100))}%`
-                }}
-                className="h-full bg-blue-950/70 text-blue-300 flex items-center justify-center border-r border-blue-500/50 truncate px-1 transition-all"
-              >
-                <span>{t('صلب 🧊', 'Solid 🧊')}</span>
-              </div>
+              {isSublimatingNow ? (
+                <>
+                  {/* Sublimating Solid Zone (0 K to T_sub): 50% width */}
+                  <div
+                    style={{ width: '50%' }}
+                    className={`h-full flex items-center justify-center border-r-2 border-amber-400/80 truncate px-1 transition-all ${
+                      phaseInfo.phase === 'solid'
+                        ? 'bg-blue-900/85 text-white font-extrabold'
+                        : 'bg-blue-950/60 text-blue-300'
+                    }`}
+                  >
+                    <span>{t('صلب 🧊 (0 K → Tₛ)', 'Solid 🧊 (0 K → Tₛ)')}</span>
+                  </div>
+                  {/* Sublimating Gas Zone (T_sub to MaxScale): 50% width */}
+                  <div
+                    style={{ width: '50%' }}
+                    className={`h-full flex items-center justify-center truncate px-1 transition-all ${
+                      phaseInfo.phase === 'gas'
+                        ? 'bg-orange-900/85 text-white font-extrabold'
+                        : 'bg-orange-950/60 text-orange-300'
+                    }`}
+                  >
+                    <span>{t('غاز 💨 (تسامي مباشر > Tₛ)', 'Gas 💨 (Direct Sublimation)')}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Solid Zone (0 K to Tm): Exact 33.3333% width */}
+                  <div
+                    style={{ width: '33.3333%' }}
+                    className={`h-full flex items-center justify-center border-r-2 border-cyan-400/70 truncate px-1 transition-all ${
+                      phaseInfo.phase === 'solid'
+                        ? 'bg-blue-900/85 text-white font-extrabold'
+                        : 'bg-blue-950/60 text-blue-300'
+                    }`}
+                  >
+                    <span>{t('صلب 🧊', 'Solid 🧊')}</span>
+                  </div>
 
-              {/* Liquid Zone (Tm to Tb) */}
-              <div
-                style={{
-                  width: `${Math.max(14, ((phaseInfo.effectiveTb - phaseInfo.effectiveTm) / maxScaleK) * 100)}%`
-                }}
-                className="h-full bg-cyan-950/70 text-cyan-200 flex items-center justify-center border-r border-cyan-500/50 truncate px-1 transition-all"
-              >
-                <span>{t('سائل 💧', 'Liquid 💧')}</span>
-              </div>
+                  {/* Liquid Zone (Tm to Tb): Exact 33.3333% width */}
+                  <div
+                    style={{ width: '33.3333%' }}
+                    className={`h-full flex items-center justify-center border-r-2 border-orange-400/70 truncate px-1 transition-all ${
+                      phaseInfo.phase === 'liquid' || phaseInfo.phase === 'melting'
+                        ? 'bg-cyan-900/85 text-white font-extrabold'
+                        : 'bg-cyan-950/60 text-cyan-200'
+                    }`}
+                  >
+                    <span>{t('سائل 💧', 'Liquid 💧')}</span>
+                  </div>
 
-              {/* Gas Zone (Tb to MaxScale) */}
-              <div className="flex-1 h-full bg-orange-950/70 text-orange-300 flex items-center justify-center truncate px-1 transition-all">
-                <span>{t('غاز 💨', 'Gas 💨')}</span>
-              </div>
+                  {/* Gas Zone (Tb to MaxScale): Exact 33.3334% width */}
+                  <div
+                    style={{ width: '33.3334%' }}
+                    className={`h-full flex items-center justify-center truncate px-1 transition-all ${
+                      phaseInfo.phase === 'gas' || phaseInfo.phase === 'boiling'
+                        ? 'bg-orange-900/85 text-white font-extrabold'
+                        : 'bg-orange-950/60 text-orange-300'
+                    }`}
+                  >
+                    <span>{t('غاز 💨', 'Gas 💨')}</span>
+                  </div>
+                </>
+              )}
 
-              {/* Needle Indicator for current actualTemp */}
+              {/* Precision Needle Indicator for current actualTemp */}
               <div
-                className="absolute top-0 bottom-0 w-1.5 bg-white shadow-[0_0_10px_#ffffff] z-30 transition-all duration-100 pointer-events-none"
+                className="absolute top-0 bottom-0 w-1.5 bg-white shadow-[0_0_12px_#ffffff] z-30 transition-all duration-75 pointer-events-none -translate-x-1/2"
                 style={{
-                  left: `${Math.max(1, Math.min(99, (actualTemp / maxScaleK) * 100))}%`
+                  left: `${phaseRulerNeedlePct}%`
                 }}
               >
-                <div className="absolute -top-1 -left-1.5 w-4 h-3 bg-white rounded-t-sm shadow-md" />
+                <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-3.5 h-2.5 bg-white rounded-b-sm shadow-md" />
+                <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-3.5 h-2.5 bg-white rounded-t-sm shadow-md" />
               </div>
             </div>
 
-            {/* Scale Axis Labels aligned with LTR physical axis */}
-            <div dir="ltr" className="flex justify-between text-[10px] text-slate-400 pt-0.5 font-mono">
-              <span className="text-blue-400">0 K ({t('صلب', 'Solid')})</span>
-              <span className="text-cyan-300 font-bold">
-                Tₘ: {phaseInfo.effectiveTm.toFixed(0)} K
+            {/* Scale Axis Labels aligned pixel-for-pixel with the exact divider borders */}
+            <div dir="ltr" className="relative h-5 text-[10px] text-slate-400 font-mono select-none">
+              <span className="absolute left-0 top-0 text-blue-400 font-bold">
+                0 K
               </span>
-              <span className="text-orange-400 font-bold">
-                T_b: {phaseInfo.effectiveTb.toFixed(0)} K
+              {isSublimatingNow ? (
+                <span
+                  style={{ left: '50%' }}
+                  className="absolute top-0 -translate-x-1/2 text-amber-300 font-bold whitespace-nowrap"
+                >
+                  ▲ Tₛ: {phaseInfo.effectiveTm.toFixed(0)} K
+                </span>
+              ) : (
+                <>
+                  <span
+                    style={{ left: '33.3333%' }}
+                    className="absolute top-0 -translate-x-1/2 text-cyan-300 font-bold whitespace-nowrap"
+                  >
+                    ▲ Tₘ: {phaseInfo.effectiveTm.toFixed(1)} K
+                  </span>
+                  <span
+                    style={{ left: '66.6667%' }}
+                    className="absolute top-0 -translate-x-1/2 text-orange-400 font-bold whitespace-nowrap"
+                  >
+                    ▲ T_b: {phaseInfo.effectiveTb.toFixed(1)} K
+                  </span>
+                </>
+              )}
+              <span className="absolute right-0 top-0 text-amber-400 font-bold">
+                {maxScaleK} K
               </span>
-              <span className="text-amber-400">{maxScaleK} K ({t('غاز', 'Gas')})</span>
             </div>
 
             {/* Live Kinetic Theory & Molecular Velocity Telemetry */}
@@ -1824,18 +1965,20 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                   {targetTemp} K ({Math.round(targetTemp - 273.15)} °C)
                 </span>
               </div>
-              <input
-                type="range"
-                min="5"
-                max={maxScaleK}
-                value={targetTemp}
-                onChange={(e) => setTargetTemp(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg cursor-pointer"
-              />
-              <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                <span>5 K</span>
-                <span>{Math.round(maxScaleK / 2)} K</span>
-                <span>{maxScaleK} K</span>
+              <div dir="ltr" className="space-y-1">
+                <input
+                  type="range"
+                  min="5"
+                  max={maxScaleK}
+                  value={targetTemp}
+                  onChange={(e) => setTargetTemp(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-800 rounded-lg cursor-pointer accent-orange-500"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>5 K</span>
+                  <span>{Math.round((maxScaleK + 5) / 2)} K</span>
+                  <span>{maxScaleK} K</span>
+                </div>
               </div>
             </div>
 

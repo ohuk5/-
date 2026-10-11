@@ -45,8 +45,38 @@ export interface LabViewer3DProps {
   iceCount?: number;
   hasActiveMetal?: 'none' | 'sodium' | 'potassium';
   hasMagnesiumRibbon?: boolean;
-  precipitateType?: 'none' | 'silver_chloride' | 'copper_hydroxide' | 'barium_sulfate' | 'iron' | 'permanganate' | 'white_salt';
+  precipitateType?:
+    | 'none'
+    | 'silver_chloride'
+    | 'copper_hydroxide'
+    | 'barium_sulfate'
+    | 'iron'
+    | 'permanganate'
+    | 'white_salt'
+    | 'copper_metal'
+    | 'golden_lead_iodide'
+    | 'carbon_black'
+    | 'prussian_blue'
+    | 'ferric_hydroxide'
+    | 'cuprous_oxide'
+    | 'sulfur_yellow'
+    | 'dichromate_green'
+    | 'molten_iron';
   lastActionMessage?: string;
+  isBalloonAttached?: boolean;
+  balloonInflation?: number; // 0 to 100
+  balloonColor?: string;
+  swellingType?: 'none' | 'carbon_snake' | 'elephant_foam' | 'dichromate_volcano';
+  swellingLevel?: number; // 0 to 100
+  crystalType?: 'none' | 'copper_blue' | 'hot_ice' | 'golden_rain' | 'silver_tree' | 'alum_clear' | 'chemical_garden' | 'gold_tree';
+  crystalLevel?: number; // 0 to 100
+  hasZincGranules?: boolean;
+  hasCopperTurnings?: boolean;
+  brownGasIntensity?: number; // 0 to 100 (NO2 gas from HNO3)
+  chemiluminescenceLevel?: number; // 0 to 100 (Luminol cold light glow)
+  silverMirrorLevel?: number; // 0 to 100 (Tollens silver mirror coating)
+  thermiteGlow?: number; // 0 to 100 (2500C molten iron thermite)
+  whiteSmokeIntensity?: number; // 0 to 100 (NH4Cl dense white smoke)
 }
 
 export const LabViewer3D: React.FC<LabViewer3DProps> = ({
@@ -73,7 +103,21 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
   hasActiveMetal = 'none',
   hasMagnesiumRibbon = false,
   precipitateType = 'none',
-  lastActionMessage
+  lastActionMessage,
+  isBalloonAttached = false,
+  balloonInflation = 0,
+  balloonColor = '#ec4899',
+  swellingType = 'none',
+  swellingLevel = 0,
+  crystalType = 'none',
+  crystalLevel = 0,
+  hasZincGranules = false,
+  hasCopperTurnings = false,
+  brownGasIntensity = 0,
+  chemiluminescenceLevel = 0,
+  silverMirrorLevel = 0,
+  thermiteGlow = 0,
+  whiteSmokeIntensity = 0
 }) => {
   const { t } = useApp();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -118,7 +162,21 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
     iceCount,
     hasActiveMetal,
     hasMagnesiumRibbon,
-    precipitateType
+    precipitateType,
+    isBalloonAttached,
+    balloonInflation,
+    balloonColor,
+    swellingType,
+    swellingLevel,
+    crystalType,
+    crystalLevel,
+    hasZincGranules,
+    hasCopperTurnings,
+    brownGasIntensity,
+    chemiluminescenceLevel,
+    silverMirrorLevel,
+    thermiteGlow,
+    whiteSmokeIntensity
   });
 
   liveStateRef.current = {
@@ -141,7 +199,21 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
     iceCount,
     hasActiveMetal,
     hasMagnesiumRibbon,
-    precipitateType
+    precipitateType,
+    isBalloonAttached,
+    balloonInflation,
+    balloonColor,
+    swellingType,
+    swellingLevel,
+    crystalType,
+    crystalLevel,
+    hasZincGranules,
+    hasCopperTurnings,
+    brownGasIntensity,
+    chemiluminescenceLevel,
+    silverMirrorLevel,
+    thermiteGlow,
+    whiteSmokeIntensity
   };
 
   // Live 3D object references
@@ -175,6 +247,19 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
   const gasSyringeGroupRef = useRef<THREE.Group | null>(null);
   const gasPlungerMeshRef = useRef<THREE.Mesh | null>(null);
   const dropperGroupRef = useRef<THREE.Group | null>(null);
+  const balloonGroupRef = useRef<THREE.Group | null>(null);
+  const balloonBodyMeshRef = useRef<THREE.Mesh | null>(null);
+  const carbonSnakeGroupRef = useRef<THREE.Group | null>(null);
+  const elephantFoamGroupRef = useRef<THREE.Group | null>(null);
+  const crystalsGroupRef = useRef<THREE.Group | null>(null);
+  const zincGranulesGroupRef = useRef<THREE.Group | null>(null);
+  const brownGasGroupRef = useRef<THREE.Group | null>(null);
+  const silverMirrorMeshRef = useRef<THREE.Mesh | null>(null);
+  const causticsDiscMeshRef = useRef<THREE.Mesh | null>(null);
+  const chemiluminescenceGroupRef = useRef<THREE.Group | null>(null);
+  const thermiteCoreGroupRef = useRef<THREE.Group | null>(null);
+  const dichromateVolcanoGroupRef = useRef<THREE.Group | null>(null);
+  const frostCylinderMeshRef = useRef<THREE.Mesh | null>(null);
 
   // Dispensing stream, falling powder & surface splash ripple refs
   const dispenseDropsGroupRef = useRef<THREE.Group | null>(null);
@@ -242,16 +327,38 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
     );
     camera.lookAt(cameraTargetRef.current);
 
-    // 3. WebGL Renderer
+    // 3. WebGL Renderer with ACES Filmic Tone Mapping & Studio Environment Map
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(width, height, false);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     renderer.domElement.style.display = 'block';
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
+
+    // Procedural Studio Environment Map for crisp glass, silver mirror, gold & liquid reflections
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    const envScene = new THREE.Scene();
+    envScene.background = new THREE.Color(0x090f1d);
+    const panelGeo = new THREE.PlaneGeometry(20, 20);
+    const topPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0xe0f2fe, side: THREE.DoubleSide }));
+    topPanel.position.set(0, 18, 0);
+    topPanel.rotation.x = Math.PI / 2;
+    envScene.add(topPanel);
+    const sidePanel1 = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide }));
+    sidePanel1.position.set(18, 6, 12);
+    sidePanel1.lookAt(0, 0, 0);
+    envScene.add(sidePanel1);
+    const sidePanel2 = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0xfef08a, side: THREE.DoubleSide }));
+    sidePanel2.position.set(-18, 8, -10);
+    sidePanel2.lookAt(0, 0, 0);
+    envScene.add(sidePanel2);
+    scene.environment = pmremGenerator.fromScene(envScene, 0.04).texture;
+    pmremGenerator.dispose();
 
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
@@ -493,20 +600,106 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
     rimMesh.renderOrder = 10;
     beakerGroup.add(rimMesh);
 
-    // Graduation Lines on Beaker (50mL to 250mL)
+    // Graduation Lines & High-DPI Pyrex Scale Label Texture on Beaker (50mL to 250mL)
     const marksGroup = new THREE.Group();
     for (let m = 1; m <= 5; m++) {
       const markY = (m / 5) * (beakerHeight - 2.5) + 0.8;
-      const markLineGeo = new THREE.TorusGeometry(beakerRadius + 0.02, 0.04, 8, 32, Math.PI / 3.2);
+      const markLineGeo = new THREE.TorusGeometry(beakerRadius + 0.02, 0.035, 8, 32, Math.PI / 3.0);
       markLineGeo.rotateX(Math.PI / 2);
       markLineGeo.rotateY(Math.PI / 6);
-      const markMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+      const markMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.88 });
       const markMesh = new THREE.Mesh(markLineGeo, markMat);
       markMesh.position.y = markY;
       markMesh.renderOrder = 11;
       marksGroup.add(markMesh);
     }
+
+    // Crisp Graduated Label Overlay on Front Glass Wall
+    const gradCanvas = document.createElement('canvas');
+    gradCanvas.width = 256;
+    gradCanvas.height = 512;
+    const gCtx = gradCanvas.getContext('2d');
+    if (gCtx) {
+      gCtx.clearRect(0, 0, 256, 512);
+      gCtx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+      gCtx.font = 'bold 20px monospace';
+      gCtx.textAlign = 'left';
+      gCtx.fillText('PYREX 250mL', 40, 56);
+      gCtx.font = 'bold 13px monospace';
+      gCtx.fillStyle = 'rgba(186, 230, 253, 0.78)';
+      gCtx.fillText('BOROSILICATE 3.3', 40, 76);
+      gCtx.font = 'bold 18px monospace';
+      gCtx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      [250, 200, 150, 100, 50].forEach((vol, i) => {
+        const yPos = 110 + i * 76;
+        gCtx.fillRect(14, yPos - 6, 24, 3);
+        gCtx.fillText(`${vol}ml`, 46, yPos + 2);
+      });
+    }
+    const gradTex = new THREE.CanvasTexture(gradCanvas);
+    const gradPatchGeo = new THREE.CylinderGeometry(beakerRadius + 0.03, beakerRadius * 0.96 + 0.03, beakerHeight * 0.86, 24, 1, true, -0.35, 0.7);
+    const gradPatchMat = new THREE.MeshBasicMaterial({
+      map: gradTex,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const gradPatchMesh = new THREE.Mesh(gradPatchGeo, gradPatchMat);
+    gradPatchMesh.position.y = beakerHeight * 0.5;
+    gradPatchMesh.renderOrder = 12;
+    marksGroup.add(gradPatchMesh);
     beakerGroup.add(marksGroup);
+
+    // Liquid Caustics / Under-Beaker Refraction Glow Disc
+    const causticsGeo = new THREE.CircleGeometry(beakerRadius * 0.95, 36);
+    causticsGeo.rotateX(-Math.PI / 2);
+    const causticsMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const causticsMesh = new THREE.Mesh(causticsGeo, causticsMat);
+    causticsMesh.position.y = 0.05;
+    causticsMesh.renderOrder = 2;
+    beakerGroup.add(causticsMesh);
+    causticsDiscMeshRef.current = causticsMesh;
+
+    // Tollens' Silver Mirror Reflective Coating Cylinder inside Beaker
+    const mirrorGeo = new THREE.CylinderGeometry(beakerRadius * 0.95, beakerRadius * 0.91, beakerHeight * 0.82, 48, 1, true);
+    const mirrorMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      metalness: 1.0,
+      roughness: 0.04,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide
+    });
+    const mirrorMesh = new THREE.Mesh(mirrorGeo, mirrorMat);
+    mirrorMesh.position.y = beakerHeight * 0.43;
+    mirrorMesh.renderOrder = 9;
+    mirrorMesh.visible = false;
+    beakerGroup.add(mirrorMesh);
+    silverMirrorMeshRef.current = mirrorMesh;
+
+    // Endothermic Cold Frost Layer on Beaker Outer Glass (< 10°C)
+    const frostGeo = new THREE.CylinderGeometry(beakerRadius + 0.015, beakerRadius * 0.96 + 0.015, beakerHeight * 0.75, 48, 1, true);
+    const frostMat = new THREE.MeshStandardMaterial({
+      color: 0xe0f2fe,
+      roughness: 0.9,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false
+    });
+    const frostMesh = new THREE.Mesh(frostGeo, frostMat);
+    frostMesh.position.y = beakerHeight * 0.4;
+    frostMesh.renderOrder = 11;
+    frostMesh.visible = false;
+    beakerGroup.add(frostMesh);
+    frostCylinderMeshRef.current = frostMesh;
 
     // Dynamic Liquid inside Beaker (Open Ended Cylinder so Meniscus Disc acts as natural top cap!)
     const liquidGeo = new THREE.CylinderGeometry(beakerRadius * 0.94, beakerRadius * 0.90, 1, 48, 1, true);
@@ -1101,6 +1294,237 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
     explosionGroup.add(volcanoFoamGroup);
     volcanoFoamGroupRef.current = volcanoFoamGroup;
 
+    // 7. 3D Inflatable Latex Gas Balloon Mounted Over Entire Beaker Rim
+    const balloonGroup = new THREE.Group();
+    balloonGroup.position.set(0, beakerHeight, 0);
+    balloonGroup.renderOrder = 12;
+
+    const balloonMat = new THREE.MeshPhysicalMaterial({
+      color: 0xec4899,
+      roughness: 0.22,
+      metalness: 0.05,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.15,
+      transparent: true,
+      opacity: 0.92
+    });
+
+    // Stretched rubber lip ring gripping around the entire outside rim of the beaker
+    const neckRingGeo = new THREE.TorusGeometry(beakerRadius * 1.04, 0.24, 16, 48);
+    neckRingGeo.rotateX(Math.PI / 2);
+    const neckRingMesh = new THREE.Mesh(neckRingGeo, balloonMat);
+    neckRingMesh.position.y = -0.45;
+    balloonGroup.add(neckRingMesh);
+
+    // Stretched latex sleeve covering the entire top rim of the beaker
+    const sleeveGeo = new THREE.CylinderGeometry(beakerRadius * 1.03, beakerRadius * 1.05, 0.65, 48);
+    const sleeveMesh = new THREE.Mesh(sleeveGeo, balloonMat);
+    sleeveMesh.position.y = -0.18;
+    balloonGroup.add(sleeveMesh);
+
+    const balloonSphereGeo = new THREE.SphereGeometry(1.0, 36, 36);
+    balloonSphereGeo.scale(1.0, 1.18, 1.0);
+    balloonSphereGeo.translate(0, 0.85, 0);
+    const balloonBodyMesh = new THREE.Mesh(balloonSphereGeo, balloonMat);
+    balloonBodyMesh.scale.set(beakerRadius * 1.02, 0.22, beakerRadius * 1.02);
+    balloonGroup.add(balloonBodyMesh);
+    balloonBodyMeshRef.current = balloonBodyMesh;
+
+    balloonGroup.visible = false;
+    beakerGroup.add(balloonGroup);
+    balloonGroupRef.current = balloonGroup;
+
+    // 8. 3D Swelling Carbon Snake Column (Sucrose + Concentrated H2SO4 Dehydration)
+    const carbonSnakeGroup = new THREE.Group();
+    carbonSnakeGroup.renderOrder = 7;
+    const carbonMat = new THREE.MeshStandardMaterial({
+      color: 0x18181b,
+      roughness: 0.92,
+      metalness: 0.08,
+      emissive: 0x27272a,
+      emissiveIntensity: 0.25
+    });
+    for (let cs = 0; cs < 22; cs++) {
+      const segR = 2.6 - (cs / 22) * 0.65 + (cs % 3) * 0.12;
+      const segGeo = new THREE.CylinderGeometry(segR * 0.92, segR, 1.1, 18);
+      const segMesh = new THREE.Mesh(segGeo, carbonMat);
+      const bendX = Math.sin((cs / 22) * Math.PI * 1.3) * 1.4;
+      const bendZ = Math.cos((cs / 22) * Math.PI * 1.1) * 0.6;
+      segMesh.position.set(bendX, 0.6 + cs * 0.72, bendZ);
+      segMesh.rotation.z = -Math.cos((cs / 22) * Math.PI) * 0.15;
+      carbonSnakeGroup.add(segMesh);
+    }
+    carbonSnakeGroup.visible = false;
+    beakerGroup.add(carbonSnakeGroup);
+    carbonSnakeGroupRef.current = carbonSnakeGroup;
+
+    // 9. 3D Giant Swelling Elephant Toothpaste Foam Tower (H2O2 + KI / Soap)
+    const elephantFoamGroup = new THREE.Group();
+    elephantFoamGroup.renderOrder = 7;
+    const elFoamGeo = new THREE.SphereGeometry(1.65, 16, 16);
+    for (let ef = 0; ef < 26; ef++) {
+      const efMat = new THREE.MeshStandardMaterial({
+        color: ef % 3 === 0 ? 0xfde047 : ef % 3 === 1 ? 0x38bdf8 : 0xf472b6,
+        roughness: 0.28,
+        metalness: 0.05,
+        transparent: true,
+        opacity: 0.94
+      });
+      const efMesh = new THREE.Mesh(elFoamGeo, efMat);
+      const spiralA = ef * 0.85;
+      const spiralR = Math.min(3.8, 0.7 + (ef / 26) * 3.1);
+      efMesh.position.set(
+        Math.cos(spiralA) * spiralR,
+        0.8 + (ef / 26) * 12.5,
+        Math.sin(spiralA) * spiralR
+      );
+      efMesh.scale.setScalar(0.8 + (ef / 26) * 0.9);
+      elephantFoamGroup.add(efMesh);
+    }
+    elephantFoamGroup.visible = false;
+    beakerGroup.add(elephantFoamGroup);
+    elephantFoamGroupRef.current = elephantFoamGroup;
+
+    // 10. 3D Geometric Crystallization Clusters (CuSO4, Hot Ice, Golden Rain, Silver Tree, Alum)
+    const crystalsGroup = new THREE.Group();
+    crystalsGroup.renderOrder = 6;
+    const prismGeo = new THREE.ConeGeometry(0.42, 2.2, 6);
+    prismGeo.translate(0, 1.1, 0);
+    const octaGeo = new THREE.OctahedronGeometry(0.65, 0);
+    for (let cr = 0; cr < 28; cr++) {
+      const cMat = new THREE.MeshPhysicalMaterial({
+        color: 0x38bdf8,
+        roughness: 0.08,
+        metalness: 0.25,
+        transmission: 0.45,
+        transparent: true,
+        opacity: 0.92,
+        clearcoat: 1.0
+      });
+      const isPrism = cr % 2 === 0;
+      const cMesh = new THREE.Mesh(isPrism ? prismGeo : octaGeo, cMat);
+      const angle = (cr / 28) * Math.PI * 2 + (cr % 3) * 0.4;
+      const rad = (cr % 5) * 0.85;
+      cMesh.position.set(Math.cos(angle) * rad, 0.45 + (cr % 4) * 0.35, Math.sin(angle) * rad);
+      cMesh.rotation.set(
+        (Math.random() - 0.5) * 0.7,
+        angle,
+        (Math.random() - 0.5) * 0.7
+      );
+      cMesh.userData = { baseY: cMesh.position.y, floatPhase: cr * 0.7 };
+      crystalsGroup.add(cMesh);
+    }
+    crystalsGroup.visible = false;
+    beakerGroup.add(crystalsGroup);
+    crystalsGroupRef.current = crystalsGroup;
+
+    // 11. 3D Metallic Zinc Granules & Copper Turnings on Beaker Bottom
+    const zincGroup = new THREE.Group();
+    zincGroup.renderOrder = 5;
+    const znGeo = new THREE.DodecahedronGeometry(0.42, 0);
+    for (let z = 0; z < 14; z++) {
+      const zMat = new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.88,
+        roughness: 0.22
+      });
+      const zMesh = new THREE.Mesh(znGeo, zMat);
+      const angle = (z / 14) * Math.PI * 2;
+      const rad = 0.8 + (z % 3) * 1.1;
+      zMesh.position.set(Math.cos(angle) * rad, 0.55, Math.sin(angle) * rad);
+      zMesh.rotation.set(z * 0.5, z * 0.8, 0);
+      zincGroup.add(zMesh);
+    }
+    zincGroup.visible = false;
+    beakerGroup.add(zincGroup);
+    zincGranulesGroupRef.current = zincGroup;
+
+    // 12. 3D Dense Reddish-Brown NO2 Gas Plume (Concentrated Nitric Acid + Metals)
+    const brownGasGroup = new THREE.Group();
+    brownGasGroup.renderOrder = 9;
+    const no2Geo = new THREE.SphereGeometry(0.95, 12, 12);
+    for (let bg = 0; bg < 24; bg++) {
+      const no2Mat = new THREE.MeshBasicMaterial({
+        color: bg % 2 === 0 ? 0xb45309 : 0x9a3412,
+        transparent: true,
+        opacity: 0.52
+      });
+      const bgMesh = new THREE.Mesh(no2Geo, no2Mat);
+      bgMesh.position.set(
+        (Math.random() - 0.5) * 5.2,
+        2.0 + Math.random() * 11.0,
+        (Math.random() - 0.5) * 5.2
+      );
+      bgMesh.userData = { speed: 0.05 + Math.random() * 0.08, phase: bg * 0.6 };
+      brownGasGroup.add(bgMesh);
+    }
+    brownGasGroup.visible = false;
+    beakerGroup.add(brownGasGroup);
+    brownGasGroupRef.current = brownGasGroup;
+
+    // 13. 3D Luminol Chemiluminescence Bioluminescent Particles & Cold Light Glow
+    const chemiGroup = new THREE.Group();
+    chemiGroup.renderOrder = 8;
+    const chemiOrbGeo = new THREE.SphereGeometry(0.18, 10, 10);
+    for (let cl = 0; cl < 36; cl++) {
+      const chemiMat = new THREE.MeshBasicMaterial({
+        color: cl % 2 === 0 ? 0x00f5d4 : 0x38bdf8,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending
+      });
+      const clMesh = new THREE.Mesh(chemiOrbGeo, chemiMat);
+      const angle = (cl / 36) * Math.PI * 6;
+      const rad = 0.5 + (cl % 5) * 0.78;
+      clMesh.position.set(Math.cos(angle) * rad, 0.8 + (cl / 36) * 6.5, Math.sin(angle) * rad);
+      clMesh.userData = { baseY: clMesh.position.y, phase: cl * 0.4 };
+      chemiGroup.add(clMesh);
+    }
+    const chemiLight = new THREE.PointLight(0x00f5d4, 4.5, 22);
+    chemiLight.position.set(0, 3.8, 0);
+    chemiGroup.add(chemiLight);
+    chemiGroup.visible = false;
+    beakerGroup.add(chemiGroup);
+    chemiluminescenceGroupRef.current = chemiGroup;
+
+    // 14. 3D Thermite 2500°C Incandescent Molten Iron Core
+    const thermiteGroup = new THREE.Group();
+    thermiteGroup.renderOrder = 8;
+    const lavaGeo = new THREE.CylinderGeometry(beakerRadius * 0.86, beakerRadius * 0.88, 1.4, 32);
+    const lavaMat = new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      transparent: true,
+      opacity: 0.96,
+      blending: THREE.AdditiveBlending
+    });
+    const lavaMesh = new THREE.Mesh(lavaGeo, lavaMat);
+    lavaMesh.position.y = 0.85;
+    thermiteGroup.add(lavaMesh);
+    const lavaLight = new THREE.PointLight(0xf97316, 6.0, 25);
+    lavaLight.position.set(0, 2.5, 0);
+    thermiteGroup.add(lavaLight);
+    thermiteGroup.visible = false;
+    beakerGroup.add(thermiteGroup);
+    thermiteCoreGroupRef.current = thermiteGroup;
+
+    // 15. 3D Ammonium Dichromate Volcanic Ash Cone & Glowing Crater
+    const dichromateGroup = new THREE.Group();
+    dichromateGroup.renderOrder = 7;
+    const volcConeGeo = new THREE.ConeGeometry(beakerRadius * 0.88, 7.2, 28);
+    volcConeGeo.translate(0, 3.6, 0);
+    const volcConeMat = new THREE.MeshStandardMaterial({
+      color: 0x14532d,
+      roughness: 0.92,
+      metalness: 0.08,
+      emissive: 0xea580c,
+      emissiveIntensity: 0.35
+    });
+    const volcConeMesh = new THREE.Mesh(volcConeGeo, volcConeMat);
+    dichromateGroup.add(volcConeMesh);
+    dichromateGroup.visible = false;
+    beakerGroup.add(dichromateGroup);
+    dichromateVolcanoGroupRef.current = dichromateGroup;
+
     scene.add(beakerGroup);
 
     // Erlenmeyer Flask on Workbench
@@ -1252,7 +1676,18 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
         hasActiveMetal: curMetal,
         isEthanolBurning: curEthanolBurn,
         isConductivityActive: curCondActive,
-        conductivityGlow: curCondGlow
+        conductivityGlow: curCondGlow,
+        isBalloonAttached: curBalloonAttached,
+        balloonInflation: curBalloonInflation,
+        swellingType: curSwellingType,
+        swellingLevel: curSwellingLevel,
+        crystalType: curCrystalType,
+        crystalLevel: curCrystalLevel,
+        brownGasIntensity: curBrownGas,
+        chemiluminescenceLevel: curChemi,
+        silverMirrorLevel: curMirror,
+        thermiteGlow: curThermite,
+        whiteSmokeIntensity: curWhiteSmoke
       } = liveStateRef.current;
 
       const currentLiqH = Math.max(0.05, Math.min(10.5, (curVol / 250) * 10.5));
@@ -1585,6 +2020,164 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
         }
       }
 
+      // 12. 3D Latex Gas Balloon Inflation Animation (Covers entire beaker mouth and grows gradually)
+      if (balloonGroupRef.current && balloonBodyMeshRef.current) {
+        const showBalloon = Boolean(curBalloonAttached || (curBalloonInflation || 0) > 0);
+        balloonGroupRef.current.visible = showBalloon;
+        if (showBalloon) {
+          const infRatio = Math.max(0, Math.min(1, (curBalloonInflation || 0) / 100));
+          const radScale = beakerRadius * 1.02 + infRatio * 2.15;
+          const heightScale = 0.22 + infRatio * 4.35;
+          const pulse = infRatio > 0.05 ? Math.sin(time * 6) * 0.05 * infRatio : 0;
+          balloonBodyMeshRef.current.scale.set(
+            radScale + pulse,
+            heightScale + pulse * 1.2,
+            radScale + pulse
+          );
+          balloonBodyMeshRef.current.rotation.z = Math.sin(time * 2.5) * 0.04 * infRatio;
+        }
+      }
+
+      // 13. 3D Swelling Carbon Snake & Elephant Toothpaste Foam Expansion
+      if (carbonSnakeGroupRef.current) {
+        const isSnake = curSwellingType === 'carbon_snake' && (curSwellingLevel || 0) > 0;
+        carbonSnakeGroupRef.current.visible = isSnake;
+        if (isSnake) {
+          const swellRatio = Math.max(0.05, Math.min(1, (curSwellingLevel || 0) / 100));
+          const visibleSegs = Math.ceil(swellRatio * 22);
+          carbonSnakeGroupRef.current.children.forEach((seg: THREE.Object3D, idx: number) => {
+            seg.visible = idx < visibleSegs;
+            const segProgress = Math.min(1, Math.max(0.1, swellRatio * 22 - idx));
+            seg.scale.set(segProgress, segProgress, segProgress);
+          });
+        }
+      }
+
+      if (elephantFoamGroupRef.current) {
+        const isFoam = curSwellingType === 'elephant_foam' && (curSwellingLevel || 0) > 0;
+        elephantFoamGroupRef.current.visible = isFoam;
+        if (isFoam) {
+          const swellRatio = Math.max(0.05, Math.min(1, (curSwellingLevel || 0) / 100));
+          const visibleBlobs = Math.ceil(swellRatio * 26);
+          elephantFoamGroupRef.current.children.forEach((blob: THREE.Object3D, idx: number) => {
+            blob.visible = idx < visibleBlobs;
+            const wobble = 1.0 + Math.sin(time * 5 + idx) * 0.06;
+            const baseS = (0.75 + (idx / 26) * 0.85) * Math.min(1, swellRatio * 1.5);
+            blob.scale.setScalar(baseS * wobble);
+          });
+        }
+      }
+
+      // 14. 3D Crystallization Growth & Golden Rain Shimmer
+      if (crystalsGroupRef.current) {
+        const hasCrystals = curCrystalType !== 'none' && (curCrystalLevel || 0) > 0;
+        crystalsGroupRef.current.visible = hasCrystals;
+        if (hasCrystals) {
+          const cRatio = Math.max(0.05, Math.min(1, (curCrystalLevel || 0) / 100));
+          const visibleCrystals = Math.ceil(cRatio * 28);
+          crystalsGroupRef.current.children.forEach((crObj: THREE.Object3D, idx: number) => {
+            crObj.visible = idx < visibleCrystals;
+            const growScale = Math.min(1.35, cRatio * 1.45);
+            if (curCrystalType === 'golden_rain') {
+              // Glittering golden PbI2 flakes slowly drifting and sparkling in liquid
+              const maxH = Math.max(1.2, currentLiqH - 0.4);
+              const driftY = ((crObj.userData.baseY + (100 - time * 0.8 + idx * 0.4) % maxH) % maxH) + 0.4;
+              crObj.position.y = hasWater ? driftY : 0.45;
+              crObj.rotation.y += 0.04;
+              crObj.rotation.x += 0.02;
+              crObj.scale.set(growScale * 0.65, growScale * 0.25, growScale * 0.65);
+            } else if (curCrystalType === 'hot_ice') {
+              // Tall needle towers of Sodium Acetate Hot Ice
+              crObj.position.y = crObj.userData.baseY;
+              crObj.scale.set(growScale * 0.85, growScale * 2.1, growScale * 0.85);
+            } else {
+              crObj.position.y = crObj.userData.baseY;
+              crObj.scale.setScalar(growScale);
+            }
+          });
+        }
+      }
+
+      // 15. 3D Reddish-Brown NO2 Gas OR Dense White NH4Cl Smoke Plume Animation
+      if (brownGasGroupRef.current) {
+        const hasNo2 = (curBrownGas || 0) > 0;
+        const hasWhite = (curWhiteSmoke || 0) > 0;
+        brownGasGroupRef.current.visible = hasNo2 || hasWhite;
+        if (hasNo2 || hasWhite) {
+          brownGasGroupRef.current.children.forEach((p: THREE.Object3D, idx: number) => {
+            const pm = p as THREE.Mesh;
+            (pm.material as THREE.MeshBasicMaterial).color.setHex(
+              hasNo2 ? (idx % 2 === 0 ? 0xb45309 : 0x9a3412) : 0xf8fafc
+            );
+            p.position.y += p.userData.speed || 0.06;
+            p.position.x += Math.sin(time * 2.5 + (p.userData.phase || 0)) * 0.03;
+            if (p.position.y > 14.5) {
+              p.position.y = Math.max(1.0, currentLiqH);
+            }
+          });
+        }
+      }
+
+      // 16. 3D Luminol Chemiluminescence Cold Light Animation
+      if (chemiluminescenceGroupRef.current) {
+        const hasChemi = (curChemi || 0) > 0;
+        chemiluminescenceGroupRef.current.visible = hasChemi;
+        if (hasChemi) {
+          chemiluminescenceGroupRef.current.rotation.y += 0.025;
+          chemiluminescenceGroupRef.current.children.forEach((cObj: THREE.Object3D) => {
+            if (cObj instanceof THREE.Mesh) {
+              const maxH = Math.max(1.5, currentLiqH - 0.3);
+              cObj.position.y = 0.5 + ((cObj.userData.baseY + time * 0.6) % maxH);
+              const s = 0.8 + Math.sin(time * 6 + (cObj.userData.phase || 0)) * 0.3;
+              cObj.scale.setScalar(s);
+            }
+          });
+        }
+      }
+
+      // 17. 3D Dichromate Volcano Swelling Cone
+      if (dichromateVolcanoGroupRef.current) {
+        const isVolc = curSwellingType === 'dichromate_volcano' && (curSwellingLevel || 0) > 0;
+        dichromateVolcanoGroupRef.current.visible = isVolc;
+        if (isVolc) {
+          const sRatio = Math.max(0.1, Math.min(1, (curSwellingLevel || 0) / 100));
+          dichromateVolcanoGroupRef.current.scale.set(1, sRatio, 1);
+        }
+      }
+
+      // 18. 3D Thermite Molten Iron Core Pulsing
+      if (thermiteCoreGroupRef.current) {
+        const hasThermite = (curThermite || 0) > 0;
+        thermiteCoreGroupRef.current.visible = hasThermite;
+        if (hasThermite) {
+          const pulse = 1.0 + Math.sin(time * 18) * 0.08;
+          thermiteCoreGroupRef.current.scale.set(1, pulse, 1);
+        }
+      }
+
+      // 19. 3D Silver Mirror Coating & Cold Frost Layer
+      if (silverMirrorMeshRef.current) {
+        const hasMirror = (curMirror || 0) > 0;
+        silverMirrorMeshRef.current.visible = hasMirror;
+        if (hasMirror) {
+          (silverMirrorMeshRef.current.material as THREE.MeshStandardMaterial).opacity = Math.min(
+            0.94,
+            ((curMirror || 0) / 100) * 0.94
+          );
+        }
+      }
+
+      if (frostCylinderMeshRef.current) {
+        const isCold = curTemp < 10.0;
+        frostCylinderMeshRef.current.visible = isCold;
+        if (isCold) {
+          (frostCylinderMeshRef.current.material as THREE.MeshStandardMaterial).opacity = Math.min(
+            0.55,
+            ((10.0 - curTemp) / 10.0) * 0.5
+          );
+        }
+      }
+
       if (container.clientWidth > 0 && container.clientHeight > 0) {
         const cw = container.clientWidth;
         const ch = container.clientHeight;
@@ -1812,13 +2405,25 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
 
               if (liquidLightRef.current) {
                 liquidLightRef.current.color.setRGB(r, g, b);
-                liquidLightRef.current.intensity = totalVolumeMl > 0 ? 1.4 : 0;
+                liquidLightRef.current.intensity = totalVolumeMl > 0 ? (chemiluminescenceLevel > 0 ? 3.8 : 1.4) : 0;
+              }
+              if (causticsDiscMeshRef.current) {
+                causticsDiscMeshRef.current.visible = totalVolumeMl > 0;
+                (causticsDiscMeshRef.current.material as THREE.MeshBasicMaterial).color.setRGB(r, g, b);
+              }
+              if (chemiluminescenceLevel > 0) {
+                mat.emissive.setHex(0x00f5d4);
+                mat.emissiveIntensity = (chemiluminescenceLevel / 100) * 0.85;
+              } else {
+                mat.emissive.setHex(0x000000);
+                mat.emissiveIntensity = 0;
               }
             }
           } else if (fluidColor === 'transparent') {
             liquidMeshRef.current.visible = false;
             if (liquidMeniscusRef.current) liquidMeniscusRef.current.visible = false;
             if (liquidLightRef.current) liquidLightRef.current.intensity = 0;
+            if (causticsDiscMeshRef.current) causticsDiscMeshRef.current.visible = false;
           } else {
             mat.color.set(fluidColor);
             mat.opacity = 0.85;
@@ -1829,6 +2434,10 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
             if (liquidLightRef.current) {
               liquidLightRef.current.color.set(fluidColor);
               liquidLightRef.current.intensity = totalVolumeMl > 0 ? 1.4 : 0;
+            }
+            if (causticsDiscMeshRef.current) {
+              causticsDiscMeshRef.current.visible = totalVolumeMl > 0;
+              (causticsDiscMeshRef.current.material as THREE.MeshBasicMaterial).color.set(fluidColor);
             }
           }
         } catch {
@@ -1849,6 +2458,24 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
         pMat.color.set(0xf8fafc); // Dense milky white / crystalline powder
       } else if (precipitateType === 'copper_hydroxide') {
         pMat.color.set(0x38bdf8); // Sky blue
+      } else if (precipitateType === 'copper_metal') {
+        pMat.color.set(0xd97706); // Reddish-copper displaced metal
+      } else if (precipitateType === 'golden_lead_iodide') {
+        pMat.color.set(0xfacc15); // Brilliant golden yellow PbI2
+      } else if (precipitateType === 'carbon_black') {
+        pMat.color.set(0x18181b); // Jet black dehydrated carbon
+      } else if (precipitateType === 'prussian_blue') {
+        pMat.color.set(0x1e3a8a); // Deep royal Prussian blue pigment
+      } else if (precipitateType === 'ferric_hydroxide') {
+        pMat.color.set(0x9a3412); // Rust reddish-brown Fe(OH)3
+      } else if (precipitateType === 'cuprous_oxide') {
+        pMat.color.set(0xdc2626); // Brick-red Fehling's Cu2O precipitate
+      } else if (precipitateType === 'sulfur_yellow') {
+        pMat.color.set(0xfef08a); // Pale yellow colloidal sulfur
+      } else if (precipitateType === 'dichromate_green') {
+        pMat.color.set(0x14532d); // Dark green Cr2O3 volcanic ash
+      } else if (precipitateType === 'molten_iron') {
+        pMat.color.set(0xf97316); // Glowing molten thermite slag
       } else if (precipitateType === 'iron') {
         pMat.color.set(0x475569); // Dark metallic iron filings
       } else if (precipitateType === 'permanganate') {
@@ -1893,6 +2520,10 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
         flameHex = 0x84cc16;
         innerHex = 0xa3e635;
         lightHex = 0x84cc16;
+      } else if (flameTestMetal === 'lithium') {
+        flameHex = 0xf43f5e;
+        innerHex = 0xfda4af;
+        lightHex = 0xf43f5e;
       }
 
       (flameMeshRef.current.material as THREE.MeshBasicMaterial).color.set(flameHex);
@@ -1988,9 +2619,64 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
       magnesiumRibbonMeshRef.current.visible = hasMagnesiumRibbon;
     }
 
-    // 11. Gas Syringe
+    // 10b. Zinc Granules & Copper Turnings
+    if (zincGranulesGroupRef.current) {
+      const showGranules = hasZincGranules || hasCopperTurnings;
+      zincGranulesGroupRef.current.visible = showGranules;
+      if (showGranules) {
+        const gHex =
+          precipitateType === 'copper_metal' || (hasCopperTurnings && !hasZincGranules)
+            ? 0xd97706
+            : 0x94a3b8;
+        zincGranulesGroupRef.current.children.forEach((child: THREE.Object3D) => {
+          const m = child as THREE.Mesh;
+          (m.material as THREE.MeshStandardMaterial).color.setHex(gHex);
+        });
+      }
+    }
+
+    // 10c. Balloon Color Update
+    if (balloonBodyMeshRef.current && balloonColor) {
+      try {
+        (balloonBodyMeshRef.current.material as THREE.MeshPhysicalMaterial).color.set(balloonColor);
+      } catch {
+        // ignore
+      }
+    }
+
+    // 10d. Crystal Material Color Update (Supports Chemical Garden & 24K Gold Tree!)
+    if (crystalsGroupRef.current && crystalType !== 'none') {
+      const gardenPalette = [0x10b981, 0x3b82f6, 0xec4899, 0xf59e0b, 0xa855f7, 0x06b6d4];
+      crystalsGroupRef.current.children.forEach((child: THREE.Object3D, idx: number) => {
+        const m = child as THREE.Mesh;
+        const mat = m.material as THREE.MeshPhysicalMaterial;
+        if (crystalType === 'chemical_garden') {
+          mat.color.setHex(gardenPalette[idx % gardenPalette.length]);
+          mat.metalness = 0.25;
+        } else if (crystalType === 'gold_tree') {
+          mat.color.setHex(0xfacc15);
+          mat.metalness = 0.96;
+          mat.roughness = 0.08;
+        } else {
+          const cHex =
+            crystalType === 'copper_blue'
+              ? 0x0284c7
+              : crystalType === 'golden_rain'
+              ? 0xfacc15
+              : crystalType === 'silver_tree'
+              ? 0xe2e8f0
+              : crystalType === 'hot_ice'
+              ? 0xf0f9ff
+              : 0xbae6fd;
+          mat.color.setHex(cHex);
+          mat.metalness = crystalType === 'silver_tree' || crystalType === 'golden_rain' ? 0.85 : 0.15;
+        }
+      });
+    }
+
+    // 11. Gas Syringe (only when balloon is not attached)
     if (gasSyringeGroupRef.current && gasPlungerMeshRef.current) {
-      const showGas = hydrogenGasMl > 0;
+      const showGas = hydrogenGasMl > 0 && !isBalloonAttached && balloonInflation <= 0;
       gasSyringeGroupRef.current.visible = showGas;
       if (showGas) {
         const plungerH = Math.min(6.5, (hydrogenGasMl / 80) * 5.0 + 1.2);
@@ -2035,7 +2721,21 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
     iceCount,
     hasActiveMetal,
     hasMagnesiumRibbon,
-    precipitateType
+    precipitateType,
+    isBalloonAttached,
+    balloonInflation,
+    balloonColor,
+    swellingType,
+    swellingLevel,
+    crystalType,
+    crystalLevel,
+    hasZincGranules,
+    hasCopperTurnings,
+    brownGasIntensity,
+    chemiluminescenceLevel,
+    silverMirrorLevel,
+    thermiteGlow,
+    whiteSmokeIntensity
   ]);
 
   // Mouse & Touch Orbit Controls
@@ -2143,10 +2843,75 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
           </div>
         )}
 
-        {hydrogenGasMl > 0 && (
+        {hydrogenGasMl > 0 && !isBalloonAttached && (
           <div className="px-2.5 py-1 rounded-lg bg-blue-950/90 backdrop-blur-md border border-blue-500/50 text-blue-300 flex items-center gap-1.5 shadow-md">
             <Wind className="w-3.5 h-3.5 text-blue-400" />
             <span className="font-bold">{t('محقنة تجميع الغاز:', 'Gas Syringe:')} {hydrogenGasMl.toFixed(0)} mL H₂</span>
+          </div>
+        )}
+
+        {(isBalloonAttached || balloonInflation > 0) && (
+          <div className="px-2.5 py-1 rounded-lg bg-pink-950/90 backdrop-blur-md border border-pink-500/60 text-pink-300 flex items-center gap-1.5 shadow-md">
+            <span>🎈</span>
+            <span className="font-bold">
+              {t('انتفاخ بالون الغاز:', 'Balloon Inflation:')} {balloonInflation.toFixed(0)}%
+            </span>
+          </div>
+        )}
+
+        {swellingType !== 'none' && swellingLevel > 0 && (
+          <div className="px-2.5 py-1 rounded-lg bg-purple-950/90 backdrop-blur-md border border-purple-500/60 text-purple-300 flex items-center gap-1.5 shadow-md animate-pulse">
+            <span>{swellingType === 'carbon_snake' ? '🐍' : '🌋'}</span>
+            <span className="font-bold">
+              {swellingType === 'carbon_snake'
+                ? `${t('انتفاخ ثعبان الكربون:', 'Carbon Snake Swelling:')} ${swellingLevel.toFixed(0)}%`
+                : `${t('انتفاخ رغوة معجون الفيل:', 'Elephant Foam Swelling:')} ${swellingLevel.toFixed(0)}%`}
+            </span>
+          </div>
+        )}
+
+        {crystalType !== 'none' && crystalLevel > 0 && (
+          <div className="px-2.5 py-1 rounded-lg bg-cyan-950/90 backdrop-blur-md border border-cyan-400/60 text-cyan-200 flex items-center gap-1.5 shadow-md">
+            <span>💎</span>
+            <span className="font-bold">
+              {t('نمو البلورات (التبلور):', 'Crystal Growth:')} {crystalLevel.toFixed(0)}%
+            </span>
+          </div>
+        )}
+
+        {brownGasIntensity > 0 && (
+          <div className="px-2.5 py-1 rounded-lg bg-amber-950/90 backdrop-blur-md border border-amber-600/60 text-amber-300 flex items-center gap-1.5 shadow-md">
+            <span>☁️</span>
+            <span className="font-bold">
+              {t('غاز NO₂ البني المتصاعد:', 'Evolving Brown NO₂ Gas:')} {brownGasIntensity.toFixed(0)}%
+            </span>
+          </div>
+        )}
+
+        {chemiluminescenceLevel > 0 && (
+          <div className="px-2.5 py-1 rounded-lg bg-teal-950/90 backdrop-blur-md border border-teal-400/60 text-teal-200 flex items-center gap-1.5 shadow-md animate-pulse">
+            <span>✨</span>
+            <span className="font-bold">
+              {t('توهج اللومينول الكيميائي:', 'Luminol Chemiluminescence:')} {chemiluminescenceLevel.toFixed(0)}%
+            </span>
+          </div>
+        )}
+
+        {silverMirrorLevel > 0 && (
+          <div className="px-2.5 py-1 rounded-lg bg-slate-800/95 backdrop-blur-md border border-slate-300/60 text-slate-100 flex items-center gap-1.5 shadow-md">
+            <span>🪞</span>
+            <span className="font-bold">
+              {t('مرآة الفضة البراقة (تولن):', 'Tollens Silver Mirror:')} {silverMirrorLevel.toFixed(0)}%
+            </span>
+          </div>
+        )}
+
+        {thermiteGlow > 0 && (
+          <div className="px-2.5 py-1 rounded-lg bg-orange-950/95 backdrop-blur-md border border-yellow-400/70 text-yellow-200 flex items-center gap-1.5 shadow-md animate-bounce">
+            <span>🔥</span>
+            <span className="font-bold">
+              {t('تفاعل الثرميت المنصهر (2500°C):', 'Molten Thermite (2500°C):')} {thermiteGlow.toFixed(0)}%
+            </span>
           </div>
         )}
       </div>
@@ -2194,16 +2959,6 @@ export const LabViewer3D: React.FC<LabViewer3DProps> = ({
           <span>{t('المعمل', 'Lab')}</span>
         </button>
       </div>
-
-      {/* Live Action & Reaction Status Banner inside 3D Viewport */}
-      {lastActionMessage && (
-        <div className="absolute bottom-12 left-3 right-3 z-10 pointer-events-none flex justify-center">
-          <div className="bg-slate-900/90 border border-cyan-500/40 backdrop-blur-md rounded-xl px-3 py-1.5 text-center text-[11px] font-bold text-cyan-200 shadow-lg flex items-center gap-1.5 max-w-full">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <span className="truncate">{lastActionMessage}</span>
-          </div>
-        </div>
-      )}
 
       {/* Camera Interactive Controls (Zoom, Auto-rotate, Reset, Fullscreen) */}
       <div className="absolute bottom-2.5 right-3 flex items-center gap-1 z-10 bg-slate-900/85 backdrop-blur-md p-1 rounded-xl border border-slate-700 shadow-lg">
