@@ -65,11 +65,21 @@ export interface BuilderElement {
 }
 
 export const BUILDER_ELEMENTS: BuilderElement[] = [
+  // Period 1
   { symbol: 'H', nameAr: 'هيدروجين', nameEn: 'Hydrogen', atomicNumber: 1, valenceElectrons: 1, primaryValence: 1, colorHex: '#FFFFFF', radius: 0.35, electronegativity: 2.20, group: 1, period: 1 },
+  { symbol: 'He', nameAr: 'هيليوم', nameEn: 'Helium', atomicNumber: 2, valenceElectrons: 2, primaryValence: 0, colorHex: '#D946EF', radius: 0.35, electronegativity: 0, group: 18, period: 1 },
+
+  // Period 2
+  { symbol: 'Li', nameAr: 'ليثيوم', nameEn: 'Lithium', atomicNumber: 3, valenceElectrons: 1, primaryValence: 1, colorHex: '#CC80FF', radius: 0.75, electronegativity: 0.98, group: 1, period: 2 },
+  { symbol: 'Be', nameAr: 'بيريليوم', nameEn: 'Beryllium', atomicNumber: 4, valenceElectrons: 2, primaryValence: 2, colorHex: '#C2FF00', radius: 0.6, electronegativity: 1.57, group: 2, period: 2 },
+  { symbol: 'B', nameAr: 'بورون', nameEn: 'Boron', atomicNumber: 5, valenceElectrons: 3, primaryValence: 3, colorHex: '#FFB5B5', radius: 0.55, electronegativity: 2.04, group: 13, period: 2 },
   { symbol: 'C', nameAr: 'كربون', nameEn: 'Carbon', atomicNumber: 6, valenceElectrons: 4, primaryValence: 4, colorHex: '#475569', radius: 0.6, electronegativity: 2.55, group: 14, period: 2 },
   { symbol: 'N', nameAr: 'نيتروجين', nameEn: 'Nitrogen', atomicNumber: 7, valenceElectrons: 5, primaryValence: 3, colorHex: '#3B82F6', radius: 0.55, electronegativity: 3.04, group: 15, period: 2 },
   { symbol: 'O', nameAr: 'أكسجين', nameEn: 'Oxygen', atomicNumber: 8, valenceElectrons: 6, primaryValence: 2, colorHex: '#EF4444', radius: 0.55, electronegativity: 3.44, group: 16, period: 2 },
   { symbol: 'F', nameAr: 'فلور', nameEn: 'Fluorine', atomicNumber: 9, valenceElectrons: 7, primaryValence: 1, colorHex: '#22C55E', radius: 0.5, electronegativity: 3.98, group: 17, period: 2 },
+  { symbol: 'Ne', nameAr: 'نيون', nameEn: 'Neon', atomicNumber: 10, valenceElectrons: 8, primaryValence: 0, colorHex: '#B3E3F5', radius: 0.45, electronegativity: 0, group: 18, period: 2 },
+
+  // Period 3
   { symbol: 'Na', nameAr: 'صوديوم', nameEn: 'Sodium', atomicNumber: 11, valenceElectrons: 1, primaryValence: 1, colorHex: '#A855F7', radius: 0.8, electronegativity: 0.93, group: 1, period: 3 },
   { symbol: 'Mg', nameAr: 'مغنيسيوم', nameEn: 'Magnesium', atomicNumber: 12, valenceElectrons: 2, primaryValence: 2, colorHex: '#10B981', radius: 0.75, electronegativity: 1.31, group: 2, period: 3 },
   { symbol: 'Al', nameAr: 'ألومنيوم', nameEn: 'Aluminum', atomicNumber: 13, valenceElectrons: 3, primaryValence: 3, colorHex: '#94A3B8', radius: 0.7, electronegativity: 1.61, group: 13, period: 3 },
@@ -77,12 +87,45 @@ export const BUILDER_ELEMENTS: BuilderElement[] = [
   { symbol: 'P', nameAr: 'فوسفور', nameEn: 'Phosphorus', atomicNumber: 15, valenceElectrons: 5, primaryValence: 3, colorHex: '#F97316', radius: 0.65, electronegativity: 2.19, group: 15, period: 3 },
   { symbol: 'S', nameAr: 'كبريت', nameEn: 'Sulfur', atomicNumber: 16, valenceElectrons: 6, primaryValence: 2, colorHex: '#FACC15', radius: 0.65, electronegativity: 2.58, group: 16, period: 3 },
   { symbol: 'Cl', nameAr: 'كلور', nameEn: 'Chlorine', atomicNumber: 17, valenceElectrons: 7, primaryValence: 1, colorHex: '#14B8A6', radius: 0.65, electronegativity: 3.16, group: 17, period: 3 },
+  { symbol: 'Ar', nameAr: 'أرجون', nameEn: 'Argon', atomicNumber: 18, valenceElectrons: 8, primaryValence: 0, colorHex: '#80D1E3', radius: 0.5, electronegativity: 0, group: 18, period: 3 },
+
+  // Period 4
   { symbol: 'K', nameAr: 'بوتاسيوم', nameEn: 'Potassium', atomicNumber: 19, valenceElectrons: 1, primaryValence: 1, colorHex: '#8B5CF6', radius: 0.9, electronegativity: 0.82, group: 1, period: 4 },
   { symbol: 'Ca', nameAr: 'كالسيوم', nameEn: 'Calcium', atomicNumber: 20, valenceElectrons: 2, primaryValence: 2, colorHex: '#06B6D4', radius: 0.85, electronegativity: 1.00, group: 2, period: 4 },
+  { symbol: 'Sc', nameAr: 'سكانديوم', nameEn: 'Scandium', atomicNumber: 21, valenceElectrons: 3, primaryValence: 3, colorHex: '#E6E6E6', radius: 0.8, electronegativity: 1.36, group: 3, period: 4 },
+  { symbol: 'Ti', nameAr: 'تيتانيوم', nameEn: 'Titanium', atomicNumber: 22, valenceElectrons: 4, primaryValence: 4, colorHex: '#BFC2C7', radius: 0.8, electronegativity: 1.54, group: 4, period: 4 },
+  { symbol: 'V', nameAr: 'فاناديوم', nameEn: 'Vanadium', atomicNumber: 23, valenceElectrons: 5, primaryValence: 5, colorHex: '#A6A6AB', radius: 0.8, electronegativity: 1.63, group: 5, period: 4 },
+  { symbol: 'Cr', nameAr: 'كروم', nameEn: 'Chromium', atomicNumber: 24, valenceElectrons: 6, primaryValence: 3, colorHex: '#8A99C7', radius: 0.75, electronegativity: 1.66, group: 6, period: 4 },
+  { symbol: 'Mn', nameAr: 'منغنيز', nameEn: 'Manganese', atomicNumber: 25, valenceElectrons: 7, primaryValence: 2, colorHex: '#9C7AC7', radius: 0.75, electronegativity: 1.55, group: 7, period: 4 },
   { symbol: 'Fe', nameAr: 'حديد', nameEn: 'Iron', atomicNumber: 26, valenceElectrons: 2, primaryValence: 3, colorHex: '#EA580C', radius: 0.8, electronegativity: 1.83, group: 8, period: 4 },
+  { symbol: 'Co', nameAr: 'كوبالت', nameEn: 'Cobalt', atomicNumber: 27, valenceElectrons: 2, primaryValence: 2, colorHex: '#0066FF', radius: 0.75, electronegativity: 1.88, group: 9, period: 4 },
+  { symbol: 'Ni', nameAr: 'نيكل', nameEn: 'Nickel', atomicNumber: 28, valenceElectrons: 2, primaryValence: 2, colorHex: '#50D050', radius: 0.75, electronegativity: 1.91, group: 10, period: 4 },
   { symbol: 'Cu', nameAr: 'نحاس', nameEn: 'Copper', atomicNumber: 29, valenceElectrons: 2, primaryValence: 2, colorHex: '#B45309', radius: 0.8, electronegativity: 1.90, group: 11, period: 4 },
+  { symbol: 'Zn', nameAr: 'زنك (خارصين)', nameEn: 'Zinc', atomicNumber: 30, valenceElectrons: 2, primaryValence: 2, colorHex: '#7D80B0', radius: 0.75, electronegativity: 1.65, group: 12, period: 4 },
+  { symbol: 'Ga', nameAr: 'غاليوم', nameEn: 'Gallium', atomicNumber: 31, valenceElectrons: 3, primaryValence: 3, colorHex: '#C28F8F', radius: 0.75, electronegativity: 1.81, group: 13, period: 4 },
+  { symbol: 'Ge', nameAr: 'جرمانيوم', nameEn: 'Germanium', atomicNumber: 32, valenceElectrons: 4, primaryValence: 4, colorHex: '#668F8F', radius: 0.75, electronegativity: 2.01, group: 14, period: 4 },
+  { symbol: 'As', nameAr: 'زرنيخ', nameEn: 'Arsenic', atomicNumber: 33, valenceElectrons: 5, primaryValence: 3, colorHex: '#BD80E3', radius: 0.7, electronegativity: 2.18, group: 15, period: 4 },
+  { symbol: 'Se', nameAr: 'سيلينيوم', nameEn: 'Selenium', atomicNumber: 34, valenceElectrons: 6, primaryValence: 2, colorHex: '#FFA100', radius: 0.7, electronegativity: 2.55, group: 16, period: 4 },
   { symbol: 'Br', nameAr: 'بروم', nameEn: 'Bromine', atomicNumber: 35, valenceElectrons: 7, primaryValence: 1, colorHex: '#991B1B', radius: 0.7, electronegativity: 2.96, group: 17, period: 4 },
-  { symbol: 'I', nameAr: 'يود', nameEn: 'Iodine', atomicNumber: 53, valenceElectrons: 7, primaryValence: 1, colorHex: '#6B21A8', radius: 0.75, electronegativity: 2.66, group: 17, period: 5 }
+  { symbol: 'Kr', nameAr: 'كريبتون', nameEn: 'Krypton', atomicNumber: 36, valenceElectrons: 8, primaryValence: 0, colorHex: '#5CB8D1', radius: 0.6, electronegativity: 3.00, group: 18, period: 4 },
+
+  // Period 5
+  { symbol: 'Rb', nameAr: 'روبيديوم', nameEn: 'Rubidium', atomicNumber: 37, valenceElectrons: 1, primaryValence: 1, colorHex: '#702EB0', radius: 0.95, electronegativity: 0.82, group: 1, period: 5 },
+  { symbol: 'Sr', nameAr: 'سترونشيوم', nameEn: 'Strontium', atomicNumber: 38, valenceElectrons: 2, primaryValence: 2, colorHex: '#00FF66', radius: 0.9, electronegativity: 0.95, group: 2, period: 5 },
+  { symbol: 'Ag', nameAr: 'فضة', nameEn: 'Silver', atomicNumber: 47, valenceElectrons: 1, primaryValence: 1, colorHex: '#C0C0C0', radius: 0.8, electronegativity: 1.93, group: 11, period: 5 },
+  { symbol: 'Sn', nameAr: 'قصدير', nameEn: 'Tin', atomicNumber: 50, valenceElectrons: 4, primaryValence: 4, colorHex: '#668080', radius: 0.8, electronegativity: 1.96, group: 14, period: 5 },
+  { symbol: 'Sb', nameAr: 'إثمد (أنتيمون)', nameEn: 'Antimony', atomicNumber: 51, valenceElectrons: 5, primaryValence: 3, colorHex: '#9E63B5', radius: 0.8, electronegativity: 2.05, group: 15, period: 5 },
+  { symbol: 'I', nameAr: 'يود', nameEn: 'Iodine', atomicNumber: 53, valenceElectrons: 7, primaryValence: 1, colorHex: '#6B21A8', radius: 0.75, electronegativity: 2.66, group: 17, period: 5 },
+  { symbol: 'Xe', nameAr: 'زينون', nameEn: 'Xenon', atomicNumber: 54, valenceElectrons: 8, primaryValence: 0, colorHex: '#429EB0', radius: 0.65, electronegativity: 2.60, group: 18, period: 5 },
+
+  // Period 6 & Actinides
+  { symbol: 'Ba', nameAr: 'باريوم', nameEn: 'Barium', atomicNumber: 56, valenceElectrons: 2, primaryValence: 2, colorHex: '#00C900', radius: 0.95, electronegativity: 0.89, group: 2, period: 6 },
+  { symbol: 'Pt', nameAr: 'بلاتين', nameEn: 'Platinum', atomicNumber: 78, valenceElectrons: 2, primaryValence: 2, colorHex: '#D0D0E0', radius: 0.85, electronegativity: 2.28, group: 10, period: 6 },
+  { symbol: 'Au', nameAr: 'ذهب', nameEn: 'Gold', atomicNumber: 79, valenceElectrons: 1, primaryValence: 3, colorHex: '#FFD700', radius: 0.85, electronegativity: 2.54, group: 11, period: 6 },
+  { symbol: 'Hg', nameAr: 'زئبق', nameEn: 'Mercury', atomicNumber: 80, valenceElectrons: 2, primaryValence: 2, colorHex: '#B8B8D0', radius: 0.85, electronegativity: 2.00, group: 12, period: 6 },
+  { symbol: 'Pb', nameAr: 'رصاص', nameEn: 'Lead', atomicNumber: 82, valenceElectrons: 4, primaryValence: 2, colorHex: '#575961', radius: 0.9, electronegativity: 2.33, group: 14, period: 6 },
+  { symbol: 'Bi', nameAr: 'بزموت', nameEn: 'Bismuth', atomicNumber: 83, valenceElectrons: 5, primaryValence: 3, colorHex: '#9E4FB5', radius: 0.85, electronegativity: 2.02, group: 15, period: 6 },
+  { symbol: 'U', nameAr: 'يورانيوم', nameEn: 'Uranium', atomicNumber: 92, valenceElectrons: 6, primaryValence: 6, colorHex: '#008FFF', radius: 0.95, electronegativity: 1.38, group: 3, period: 7 }
 ];
 
 export const BUILDER_ELEMENTS_MAP = new Map<string, BuilderElement>(

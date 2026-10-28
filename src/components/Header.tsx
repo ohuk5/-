@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Atom, Flame, Radiation, BookOpen, FlaskConical, Sun, Moon, Globe2, Volume2, VolumeX, Sparkles, Network } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { Atom, Flame, Radiation, BookOpen, FlaskConical, Sun, Moon, Globe2, Volume2, VolumeX, Sparkles, Network, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useApp, ActiveTabType, ApparatusStationType } from '../context/AppContext';
 
 interface HeaderProps {
@@ -21,6 +21,40 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
     setActiveApparatusStation
   } = useApp();
   const isDark = theme === 'dark';
+
+  const navRef = useRef<HTMLDivElement>(null);
+  const isNavDragging = useRef<boolean>(false);
+  const startX = useRef<number>(0);
+  const scrollLeftVal = useRef<number>(0);
+
+  const scrollNav = (direction: 'left' | 'right') => {
+    if (navRef.current) {
+      const scrollAmount = 240;
+      navRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const handleNavMouseDown = (e: React.MouseEvent) => {
+    if (!navRef.current) return;
+    isNavDragging.current = true;
+    startX.current = e.pageX - navRef.current.offsetLeft;
+    scrollLeftVal.current = navRef.current.scrollLeft;
+  };
+
+  const handleNavMouseMove = (e: React.MouseEvent) => {
+    if (!isNavDragging.current || !navRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - navRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5;
+    navRef.current.scrollLeft = scrollLeftVal.current - walk;
+  };
+
+  const handleNavMouseUp = () => {
+    isNavDragging.current = false;
+  };
 
   // Global Keyboard Navigation Shortcuts
   useEffect(() => {
@@ -177,39 +211,73 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
           </div>
         </div>
 
-        {/* Zone 2: Unified Scientific Module Navigation */}
-        <nav
-          aria-label="Primary Simulation Modules"
-          className={`w-full xl:w-auto flex items-center justify-start xl:justify-center gap-1.5 p-1.5 rounded-2xl border overflow-x-auto scrollbar-none ${
-            isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200/90'
-          }`}
-        >
-          {navItems.map((item) => {
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl font-bold transition-all text-xs sm:text-sm whitespace-nowrap shrink-0 ${
-                  isActive
-                    ? 'bg-cyan-600 text-white shadow-md'
-                    : isDark
-                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/80'
-                    : 'text-slate-700 hover:text-slate-950 hover:bg-white'
-                }`}
-              >
-                <span className={isActive ? 'text-white' : 'text-cyan-400'}>{item.icon}</span>
-                <span>
-                  <span className={`font-mono text-xs me-1.5 ${isActive ? 'text-cyan-100' : 'text-slate-400'}`}>
-                    {item.num}.
+        {/* Zone 2: Unified Scientific Module Navigation with Chevrons and Pan */}
+        <div className="relative flex items-center w-full xl:w-auto max-w-full">
+          <button
+            type="button"
+            onClick={() => scrollNav('right')}
+            className={`p-1.5 rounded-xl border shrink-0 me-1 flex items-center justify-center transition-all ${
+              isDark
+                ? 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+                : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-white'
+            }`}
+            title={t('تمرير يميناً', 'Scroll Right')}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <nav
+            ref={navRef}
+            onMouseDown={handleNavMouseDown}
+            onMouseMove={handleNavMouseMove}
+            onMouseUp={handleNavMouseUp}
+            onMouseLeave={handleNavMouseUp}
+            aria-label="Primary Simulation Modules"
+            className={`w-full xl:w-auto flex items-center justify-start xl:justify-center gap-1.5 p-1.5 rounded-2xl border overflow-x-auto scrollbar-none cursor-grab active:cursor-grabbing select-none ${
+              isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200/90'
+            }`}
+          >
+            {navItems.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl font-bold transition-all text-xs sm:text-sm whitespace-nowrap shrink-0 ${
+                    isActive
+                      ? 'bg-cyan-600 text-white shadow-md'
+                      : isDark
+                      ? 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                      : 'text-slate-700 hover:text-slate-950 hover:bg-white'
+                  }`}
+                >
+                  <span className={isActive ? 'text-white' : 'text-cyan-400'}>{item.icon}</span>
+                  <span>
+                    <span className={`font-mono text-xs me-1 ${isActive ? 'text-cyan-100' : 'text-slate-400'}`}>
+                      {item.num}.
+                    </span>
+                    <span className="hidden sm:inline">{t(item.labelAr, item.labelEn)}</span>
+                    <span className="sm:hidden inline">{t(item.shortAr, item.shortEn)}</span>
                   </span>
-                  {t(item.labelAr, item.labelEn)}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
+                </button>
+              );
+            })}
+          </nav>
+
+          <button
+            type="button"
+            onClick={() => scrollNav('left')}
+            className={`p-1.5 rounded-xl border shrink-0 ms-1 flex items-center justify-center transition-all ${
+              isDark
+                ? 'bg-slate-900/90 border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800'
+                : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-white'
+            }`}
+            title={t('تمرير يساراً', 'Scroll Left')}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        </div>
 
         {/* Zone 3: Desktop Global Utility Actions */}
         <div className="hidden xl:flex items-center gap-2.5 shrink-0">

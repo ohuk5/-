@@ -139,6 +139,28 @@ const REAGENTS: LabReagent[] = [
     descEn: 'Indicator blend coloring solution according to pH (red=acid, green=neutral, purple=base).'
   },
   {
+    id: 'bromothymol_blue',
+    nameAr: 'كاشف أزرق البروموثيمول',
+    nameEn: 'Bromothymol Blue Indicator',
+    formula: 'C₂₇H₂₈Br₂O₅S',
+    type: 'indicator',
+    defaultColor: 'rgba(34, 197, 94, 0.88)',
+    phValue: 7.0,
+    descAr: 'كاشف دقيق لتحولات الحموضة: أصفر ساطع في الوسط الحمضي (pH < 6.0)، أخضر زمردي في المتعادل (pH 7.0)، وأزرق ملكي في القلوي (pH > 7.6).',
+    descEn: 'Precise pH indicator: bright yellow in acid (pH < 6.0), emerald green in neutral (pH 7.0), and deep blue in base (pH > 7.6).'
+  },
+  {
+    id: 'limewater',
+    nameAr: 'ماء الجير الرائق (هيدروكسيد الكالسيوم)',
+    nameEn: 'Limewater Solution (Calcium Hydroxide)',
+    formula: 'Ca(OH)₂ (aq)',
+    type: 'liquid',
+    defaultColor: 'rgba(240, 249, 255, 0.55)',
+    phValue: 12.4,
+    descAr: 'محلول مائي رائق يكشف عن غاز ثاني أكسيد الكربون CO₂؛ يتعكر فوراً ويتحول إلى أبيض حليبي بتشكل كربونات الكالسيوم CaCO₃!',
+    descEn: 'Clear solution that detects CO₂ gas; turns cloudy milky-white upon contact with CO₂ due to CaCO₃ precipitation!'
+  },
+  {
     id: 'ice_cubes',
     nameAr: 'مكعبات ثلج نقي',
     nameEn: 'Pure Ice Cubes',
@@ -700,6 +722,8 @@ interface BeakerContent {
   tollensReagentMl?: number;
   fehlingMl?: number;
   oxalicAcidMl?: number;
+  bromothymolDrops?: number;
+  limewaterMl?: number;
 }
 
 export const ExperimentalLab: React.FC = () => {
@@ -890,6 +914,7 @@ export const ExperimentalLab: React.FC = () => {
       (content.tollensReagentMl || 0) +
       (content.fehlingMl || 0) +
       (content.oxalicAcidMl || 0) +
+      (content.limewaterMl || 0) +
       (content.methyleneBlueMl || 0) +
       (content.indigoCarmineMl || 0) +
       (content.nickelSulfateMl || 0) +
@@ -1161,6 +1186,7 @@ export const ExperimentalLab: React.FC = () => {
   const totalBaseUnits =
     content.baseMl * 2.5 +
     (content.sodiumSilicateMl || 0) * 2.0 +
+    (content.limewaterMl || 0) * 1.8 +
     (content.calciumCarbideG || 0) * 1.8 +
     content.ammoniaMl * 1.4 +
     content.bakingSodaG * 0.65 +
@@ -1308,9 +1334,10 @@ export const ExperimentalLab: React.FC = () => {
       return 'rgba(30, 58, 138, 0.92)';
     }
 
-    // 0.2 Silver Chloride or Barium Sulfate or Silica Gel Precipitate (Dense Milky White Suspension)
+    // 0.2 Silver Chloride, Barium Sulfate, Limewater CaCO3, or Silica Gel Precipitate (Dense Milky White Suspension)
     if (
       (content.silverNitrateMl > 0 && (content.acidMl > 0 || content.calciumChlorideG > 0 || (content.lithiumG || 0) > 0 || (content.ammoniumChlorideG || 0) > 0)) ||
+      ((content.limewaterMl || 0) > 0 && ((content.bakingSodaG > 0 && content.acidMl > 0) || content.precipitateG > 0)) ||
       ((content.bariumG || 0) > 0 && ((content.sulfuricAcidMl || 0) > 0 || content.copperSulfateMl > 0)) ||
       ((content.sodiumSilicateMl || 0) > 0 && (content.acidMl > 0 || (content.sulfuricAcidMl || 0) > 0))
     ) {
@@ -1321,6 +1348,13 @@ export const ExperimentalLab: React.FC = () => {
     if (content.phenolphthaleinDrops > 0 && currentPh >= 8.2) {
       const pinkOpacity = Math.min(0.95, 0.6 + (currentPh - 8.2) * 0.2);
       return `rgba(236, 72, 153, ${pinkOpacity})`;
+    }
+
+    // 1b. Bromothymol Blue Indicator: Yellow in acid (pH < 6.0), Emerald Green in neutral, Royal Blue in base (pH > 7.6)
+    if ((content.bromothymolDrops || 0) > 0) {
+      if (currentPh < 6.0) return 'rgba(250, 204, 21, 0.92)'; // Bright Yellow (acid)
+      if (currentPh <= 7.6) return 'rgba(34, 197, 94, 0.90)'; // Emerald Green (neutral)
+      return 'rgba(2, 132, 199, 0.92)'; // Royal Blue (alkaline)
     }
 
     // 2. Universal indicator spectrum:
@@ -1583,6 +1617,19 @@ export const ExperimentalLab: React.FC = () => {
       } else if (reagentId === 'universal_indicator') {
         next.universalDrops += drops;
         setLastActionMessage(t(`أُضيفت ${drops} قطرات من كاشف الحموضة الشامل. تلوّن المحلول وفق مقياس pH.`, `Added ${drops} drops of universal indicator. Colored according to pH.`));
+      } else if (reagentId === 'bromothymol_blue') {
+        next.bromothymolDrops = (next.bromothymolDrops || 0) + drops;
+        setLastActionMessage(t(`أُضيفت ${drops} قطرات من كاشف أزرق البروموثيمول (أصفر بالحمض pH < 6، أخضر متعادل pH 7، أزرق بالقواعد pH > 7.6).`, `Added ${drops} drops of Bromothymol Blue (Yellow in acid, Green in neutral, Blue in base).`));
+      } else if (reagentId === 'limewater') {
+        next.limewaterMl = Math.min(200, (next.limewaterMl || 0) + amountMl);
+        if (next.bakingSodaG > 0 && (next.acidMl > 0 || (next.aceticAcidMl || 0) > 0 || (next.sulfuricAcidMl || 0) > 0)) {
+          playSoundEffect('precipitate');
+          next.precipitateG = Math.min(35, next.precipitateG + 4.5);
+          setActiveChemicalEquation('Ca(OH)₂(aq) + CO₂(g) → CaCO₃↓ (Milky White Precipitate) + H₂O');
+          setLastActionMessage(t('تعكير ماء الجير الرائق! تفاعل غاز CO₂ المتصاعد مع هيدروكسيد الكالسيوم مرسّباً كربونات الكالسيوم CaCO₃ البيضاء الحليبية!', 'Limewater test positive! Evolved CO₂ reacted with Ca(OH)₂ precipitating milky white Calcium Carbonate CaCO₃!'));
+        } else {
+          setLastActionMessage(t(`أُضيف ${doseLabelAr} من ماء الجير الرائق Ca(OH)₂. أضف بيكربونات الصوديوم والحمض لتوليد غاز CO₂ وتعكير المحلول!`, `Added ${doseLabelEn} Limewater. Add baking soda and acid to generate CO₂ and turn it milky!`));
+        }
       } else if (reagentId === 'ice_cubes') {
         next.iceCount = Math.min(8, next.iceCount + 2);
         setCurrentTempC(prevT => Math.max(1.0, prevT - 7.5));
@@ -2377,7 +2424,9 @@ export const ExperimentalLab: React.FC = () => {
       ammoniumChlorideG: 0,
       tollensReagentMl: 0,
       fehlingMl: 0,
-      oxalicAcidMl: 0
+      oxalicAcidMl: 0,
+      bromothymolDrops: 0,
+      limewaterMl: 0
     });
     explosionsRef.current = [];
     skitteringPelletsRef.current = [];
@@ -2712,7 +2761,9 @@ export const ExperimentalLab: React.FC = () => {
       ammoniumChlorideG: 0,
       tollensReagentMl: 0,
       fehlingMl: 0,
-      oxalicAcidMl: 0
+      oxalicAcidMl: 0,
+      bromothymolDrops: 0,
+      limewaterMl: 0
     });
     explosionsRef.current = [];
     skitteringPelletsRef.current = [];
@@ -3190,6 +3241,116 @@ export const ExperimentalLab: React.FC = () => {
       resultAr: 'يزيح الخارصين أيونات الذهب الثلاثية فتترسب بلورات وتفرعات شجرية من الذهب المعدني الخالص Au⁰.',
       resultEn: 'Zinc metal reduces Au³⁺ ions into shimmering dendritic crystals of pure 24K metallic gold.',
       isCompleted: () => hasGoldTree
+    },
+    {
+      id: 'magnesium_acid_hydrogen',
+      icon: '⚡',
+      labelAr: 'شريط المغنيسيوم + الحمض (فوران واشتعال الهيدروجين)',
+      labelEn: 'Magnesium Ribbon + Acid (Vigorous H₂ & Flare)',
+      badge: 'Mg + 2HCl → MgCl₂ + H₂↑',
+      equation: 'Mg(s) + 2HCl(aq) → MgCl₂(aq) + H₂↑ (Rapid Effervescence & Flare)',
+      requiredReagents: ['magnesium_ribbon', 'acid_hcl'],
+      stepsAr: [
+        '1️⃣ أضف محلول (حمض الهيدروكلوريك المخفف HCl) إلى الكأس.',
+        '2️⃣ أضف (شريط مغنيسيوم نقي Mg) من قسم الفلزات.',
+        '3️⃣ شاهد الفوران السريع وتصاعد غاز الهيدروجين H₂، واضغط زر (شرارة إشعال ⚡) لاختبار الفرقعة أو إشعال اللهب!'
+      ],
+      stepsEn: [
+        '1️⃣ Add Dilute Hydrochloric Acid (HCl) into the beaker.',
+        '2️⃣ Add Pure Magnesium Ribbon (Mg) from the metals shelf.',
+        '3️⃣ Watch vigorous fizzing and H₂ gas release, then click "Spark ⚡" for the explosive pop test!'
+      ],
+      resultAr: 'يتفاعل المغنيسيوم بنشاط فائق مع الحمض مطلقاً فقاعات غاز الهيدروجين مع حرارة ملحوظة.',
+      resultEn: 'Magnesium reacts vigorously with acid releasing flammable H₂ bubbles and rapid exothermic heating.',
+      isCompleted: c => (c.magnesiumG || 0) > 0 && c.acidMl > 0
+    },
+    {
+      id: 'disappearing_cross_sunset',
+      icon: '🌅',
+      labelAr: 'تعتيم الكبريت الغروي والغروب الكيميائي (ساعة الثيوكبريتات)',
+      labelEn: 'Colloidal Sulfur Clouding & Sunset (Thiosulfate Reaction)',
+      badge: 'Na₂S₂O₃ + 2HCl → S↓',
+      equation: 'Na₂S₂O₃(aq) + 2HCl(aq) → S↓ (Milky-Yellow Colloidal Sulfur) + SO₂↑ + 2NaCl + H₂O',
+      requiredReagents: ['sodium_thiosulfate', 'acid_hcl'],
+      stepsAr: [
+        '1️⃣ من رف المواد، أضف محلول (ثيوكبريتات الصوديوم Na₂S₂O₃) إلى الكأس.',
+        '2️⃣ أضف (حمض الهيدروكلوريك HCl) من قسم الأحماض.',
+        '3️⃣ راقب تعكر المحلول التدريجي وتكون المعلق الغروي الأصفر للكبريت S↓ الذي يحاكي غروب الشمس وظاهرة تيندال!'
+      ],
+      stepsEn: [
+        '1️⃣ Add Sodium Thiosulfate solution (Na₂S₂O₃) from the shelf.',
+        '2️⃣ Add Hydrochloric Acid (HCl) from the acids shelf.',
+        '3️⃣ Observe the progressive clouding and yellow colloidal sulfur precipitation (Tyndall effect / sunset demo)!'
+      ],
+      resultAr: 'ترسب الكبريت الغروي الدقيق S↓ معتماً الضوء ومحاكياً ظاهرة غروب الشمس وتشتت الضوء.',
+      resultEn: 'Precipitation of fine colloidal sulfur (S↓) creating progressive turbidity and light scattering.',
+      isCompleted: c => ((c.sodiumThiosulfateMl || 0) > 0 || (c.thiosulfateMl || 0) > 0) && c.acidMl > 0
+    },
+    {
+      id: 'silver_halide_test',
+      icon: '🥛',
+      labelAr: 'الكشف عن هاليد الفضة (ترسيب كلوريد الفضة الأبيض الحليبي)',
+      labelEn: 'Silver Halide Test (Milky AgCl Precipitation)',
+      badge: 'AgNO₃ + HCl → AgCl↓',
+      equation: 'AgNO₃(aq) + HCl(aq) → AgCl↓ (Dense Curdy White Precipitate) + HNO₃(aq)',
+      requiredReagents: ['silver_nitrate', 'acid_hcl'],
+      stepsAr: [
+        '1️⃣ أضف محلول (نترات الفضة AgNO₃) إلى الكأس.',
+        '2️⃣ أضف قطرات من (حمض الهيدروكلوريك HCl) أو (كلوريد الكالسيوم CaCl₂).',
+        '3️⃣ شاهد التكون الفوري للراسب الأبيض الحليبي المتخثر من كلوريد الفضة AgCl!'
+      ],
+      stepsEn: [
+        '1️⃣ Add Silver Nitrate solution (AgNO₃) to the beaker.',
+        '2️⃣ Add drops of Dilute Hydrochloric Acid (HCl) or Calcium Chloride (CaCl₂).',
+        '3️⃣ Watch the instant formation of dense curdy white Silver Chloride (AgCl) precipitate!'
+      ],
+      resultAr: 'تتحد أيونات الفضة Ag⁺ مع أيونات الكلوريد Cl⁻ لتكوين راسب كلوريد الفضة الأبيض الحليبي غير القابل للذوبان.',
+      resultEn: 'Silver Ag⁺ and chloride Cl⁻ ions combine to precipitate insoluble dense white curdy AgCl.',
+      isCompleted: c => c.silverNitrateMl > 0 && (c.acidMl > 0 || c.calciumChlorideG > 0) && c.precipitateG > 0
+    },
+    {
+      id: 'bromothymol_neutralization',
+      icon: '🧪',
+      labelAr: 'المعايرة اللونية الدقيقة بكاشف أزرق البروموثيمول',
+      labelEn: 'Colorimetric Titration with Bromothymol Blue',
+      badge: 'pH Spectrum (Yellow ⇌ Green ⇌ Blue)',
+      equation: 'H⁺(aq, Yellow at pH < 6.0) ⇌ Neutral(Green at pH 7.0) ⇌ OH⁻(aq, Blue at pH > 7.6)',
+      requiredReagents: ['bromothymol_blue', 'acid_hcl', 'base_naoh'],
+      stepsAr: [
+        '1️⃣ أضف 50 مل ماء مقطر ثم أضف قطرات من (كاشف أزرق البروموثيمول) فيكون لونه أخضر زمردياً (pH = 7).',
+        '2️⃣ أضف قطرات من حمض HCl فيتحول فوراً للأصفر الساطع (وسط حمضي).',
+        '3️⃣ عادله تدريجياً بإضافة قطرات من هيدروكسيد الصوديوم NaOH حتى يعود أخضر زمردياً ثم أزرق ملكياً!'
+      ],
+      stepsEn: [
+        '1️⃣ Add distilled water, then add Bromothymol Blue indicator — it turns emerald green (neutral pH 7).',
+        '2️⃣ Add drops of dilute HCl — the liquid instantly turns bright yellow (acidic).',
+        '3️⃣ Titrate by adding dilute NaOH drops to shift it through emerald green back to deep royal blue!'
+      ],
+      resultAr: 'تحول لوني ثلاثي فائق الدقة يوضح نقطة التعادل الكيميائي (أصفر في الحمض، أخضر في التعادل، أزرق في القلوي).',
+      resultEn: 'High-contrast tri-state color shift demonstrating chemical equivalence (Yellow < 6.0, Green = 7.0, Blue > 7.6).',
+      isCompleted: c => (c.bromothymolDrops || 0) > 0
+    },
+    {
+      id: 'limewater_co2_clouding',
+      icon: '🫧',
+      labelAr: 'الكشف عن CO₂ وتعكير ماء الجير الرائق (CaCO₃)',
+      labelEn: 'Limewater CO₂ Detection & Clouding (CaCO₃)',
+      badge: 'Ca(OH)₂ + CO₂ → CaCO₃↓',
+      equation: 'Ca(OH)₂(aq, Clear) + CO₂(g) → CaCO₃↓ (Milky White Clouding) + H₂O(l)',
+      requiredReagents: ['limewater', 'baking_soda', 'acid_hcl'],
+      stepsAr: [
+        '1️⃣ من رف المواد، أضف محلول (ماء الجير الرائق Ca(OH)₂) الشفاف إلى الكأس.',
+        '2️⃣ أضف (مسحوق بيكربونات الصوديوم) ثم قطرات من (حمض HCl) لتوليد غاز CO₂.',
+        '3️⃣ شاهد تعكر المحلول الفوري وتحوله إلى الأبيض الحليبي بتشكل راسب كربونات الكالسيوم CaCO₃!'
+      ],
+      stepsEn: [
+        '1️⃣ Add clear Limewater solution (Ca(OH)₂) from the shelf.',
+        '2️⃣ Add Baking Soda powder, then add drops of dilute HCl to generate CO₂ gas.',
+        '3️⃣ Watch the limewater turn milky cloudy white as Calcium Carbonate (CaCO₃) precipitates!'
+      ],
+      resultAr: 'يتفاعل غاز ثاني أكسيد الكربون مع هيدروكسيد الكالسيوم مرسباً كربونات الكالسيوم البيضاء الدقيقة.',
+      resultEn: 'Carbon dioxide gas precipitates fine white insoluble Calcium Carbonate, turning limewater cloudy.',
+      isCompleted: c => (c.limewaterMl || 0) > 0 && c.bakingSodaG > 0 && c.acidMl > 0
     }
   ];
 

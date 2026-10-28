@@ -14,7 +14,9 @@ import {
   Box,
   Sparkles,
   Flame,
-  Radiation
+  Radiation,
+  Atom,
+  X
 } from 'lucide-react';
 import { ALL_ELEMENTS, ELEMENT_MAP, ElementInfo, CATEGORY_COLORS } from '../data/elementsData';
 import { getElementDescription } from '../data/elementDescriptionsEn';
@@ -47,6 +49,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
   const [showSpinArrows, setShowSpinArrows] = useState<boolean>(true);
   const [orbitSpeed, setOrbitSpeed] = useState<number>(1.0); // 0 (pause), 0.3 (slow motion), 1.0 (normal), 1.6 (fast)
   const [dimensionMode, setDimensionMode] = useState<'3d' | '2d'>('2d');
+  const [isMobileControlsOpen, setIsMobileControlsOpen] = useState<boolean>(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const nucleusNodesRef = useRef<NucleusNode[]>([]);
@@ -1459,6 +1462,157 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         onSelectElement={loadElement}
         currentAtomicNumber={protons}
       />
+
+      {/* Mobile Floating Action Bar for Particle Controls (Visible on md:hidden) */}
+      <div className="fixed bottom-4 inset-x-4 z-40 md:hidden flex items-center justify-between gap-2 p-2 rounded-2xl bg-slate-900/95 border border-cyan-500/50 shadow-2xl backdrop-blur-md">
+        <div className="flex items-center gap-2.5 text-xs font-mono font-bold px-2">
+          <span className="text-red-400">P:{protons}</span>
+          <span className="text-slate-300">N:{neutrons}</span>
+          <span className="text-blue-400">E:{electrons}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsMobileControlsOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm"
+          >
+            <span>⚙️ {t('التحكم بالجسيمات', 'Controls')}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsPeriodicTableOpen(true)}
+            className="p-1.5 rounded-xl bg-slate-800 text-cyan-300 border border-slate-700 text-xs"
+            title={t('الجدول الدوري', 'Periodic Table')}
+          >
+            <Table className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Bottom Sheet Controls Drawer */}
+      {isMobileControlsOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex flex-col justify-end bg-black/75 backdrop-blur-xs animate-in fade-in duration-200">
+          <div
+            className="absolute inset-0"
+            onClick={() => setIsMobileControlsOpen(false)}
+          />
+          <div className={`relative z-10 w-full max-h-[85vh] rounded-t-3xl border-t p-5 flex flex-col gap-3.5 shadow-2xl overflow-y-auto ${
+            isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-900'
+          }`}>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Atom className="w-5 h-5 text-cyan-400" />
+                <h3 className="font-bold text-base">
+                  {t('لوحة التحكم بالجسيمات الذرية', 'Particle Controls')}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileControlsOpen(false)}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Protons Control */}
+            <div className="p-3 rounded-xl border border-red-950/40 bg-slate-950/70 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-red-950/60 border border-red-500/50 flex items-center justify-center text-red-400 font-bold text-xs">p⁺</span>
+                  <span className="text-xs font-bold text-red-400">{t('البروتونات (Z)', 'Protons (Z)')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setProtons(p => Math.max(0, p - 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold text-sm flex items-center justify-center">-</button>
+                  <span className="w-8 text-center font-mono font-bold text-red-400 text-base">{protons}</span>
+                  <button onClick={() => setProtons(p => Math.min(118, p + 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold text-sm flex items-center justify-center">+</button>
+                </div>
+              </div>
+              <input type="range" min="0" max="118" value={protons} onChange={e => setProtons(parseInt(e.target.value))} className="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" />
+            </div>
+
+            {/* Neutrons Control */}
+            <div className="p-3 rounded-xl border border-slate-800 bg-slate-950/70 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-600/50 flex items-center justify-center text-slate-300 font-bold text-xs">n⁰</span>
+                  <span className="text-xs font-bold text-slate-300">{t('النيوترونات (N)', 'Neutrons (N)')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setNeutrons(n => Math.max(0, n - 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold text-sm flex items-center justify-center">-</button>
+                  <span className="w-8 text-center font-mono font-bold text-slate-300 text-base">{neutrons}</span>
+                  <button onClick={() => setNeutrons(n => Math.min(176, n + 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold text-sm flex items-center justify-center">+</button>
+                </div>
+              </div>
+              <input type="range" min="0" max="176" value={neutrons} onChange={e => setNeutrons(parseInt(e.target.value))} className="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" />
+            </div>
+
+            {/* Electrons Control */}
+            <div className="p-3 rounded-xl border border-blue-950/40 bg-slate-950/70 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-blue-950/60 border border-blue-500/50 flex items-center justify-center text-blue-400 font-bold text-xs">e⁻</span>
+                  <span className="text-xs font-bold text-blue-400">{t('الإلكترونات (e⁻)', 'Electrons (e⁻)')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setElectrons(e => Math.max(0, e - 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold text-sm flex items-center justify-center">-</button>
+                  <span className="w-8 text-center font-mono font-bold text-blue-400 text-base">{electrons}</span>
+                  <button onClick={() => setElectrons(e => Math.min(118, e + 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-white font-bold text-sm flex items-center justify-center">+</button>
+                </div>
+              </div>
+              <input type="range" min="0" max="118" value={electrons} onChange={e => setElectrons(parseInt(e.target.value))} className="w-full h-1.5 bg-slate-800 rounded-lg cursor-pointer" />
+            </div>
+
+            {/* Quick Actions in Drawer */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={stabilizeCurrentNucleus}
+                disabled={protons === 0 || isStable}
+                className="py-2 px-3 rounded-xl border border-emerald-800/60 bg-emerald-950/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-40"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{t('موازنة الاستقرار', 'Stabilize')}</span>
+              </button>
+              <button
+                onClick={neutralizeCurrentAtom}
+                disabled={protons === 0 || netCharge === 0}
+                className="py-2 px-3 rounded-xl border border-cyan-800/60 bg-cyan-950/40 text-cyan-300 text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-40"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>{t('موازنة الشحنة (0)', 'Neutralize (0)')}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={resetAtom}
+                className="py-2 px-3 bg-red-950/30 hover:bg-red-900/40 border border-red-900/50 text-red-400 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>{t('تصفير الذرة', 'Reset Atom')}</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsMobileControlsOpen(false);
+                  setIsPeriodicTableOpen(true);
+                }}
+                className="py-2 px-3 bg-cyan-950/80 border border-cyan-700/60 text-cyan-300 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                <Table className="w-3.5 h-3.5" />
+                <span>{t('الجدول الدوري', 'Periodic Table')}</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileControlsOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md mt-1"
+            >
+              {t('إغلاق / العودة للنموذج الذري', 'Close / Back to Atom')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

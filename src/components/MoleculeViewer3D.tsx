@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { RotateCw, ZoomIn, ZoomOut, Maximize2, Sparkles, Layers } from 'lucide-react';
+import { RotateCw, ZoomIn, ZoomOut, Maximize2, Sparkles, Layers, Palette, Zap } from 'lucide-react';
 import { CompoundInfo, CompositionAnalysisResult, BUILDER_ELEMENTS_MAP } from '../data/compoundsData';
 import { useApp } from '../context/AppContext';
 
@@ -27,6 +27,7 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
 
   const [isRotating, setIsRotating] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<'ball_and_stick' | 'space_filling'>('ball_and_stick');
+  const [bondStyle, setBondStyle] = useState<'split_color' | 'classic' | 'glowing'>('split_color');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
 
   // Mouse / Touch interaction state
@@ -142,15 +143,22 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
     let bondData: { from: number; to: number; order: 1 | 2 | 3 }[] = [];
 
     if (compound && compound.structure3D && compound.structure3D.atoms.length > 0) {
-      // Use predefined 3D coordinates
+      // Use predefined 3D coordinates with scale expansion for spacious ball-and-stick rods
+      const posScale = viewMode === 'space_filling' ? 1.0 : 1.45;
       atomData = compound.structure3D.atoms.map(a => {
         const el = BUILDER_ELEMENTS_MAP.get(a.element);
         const color = a.color || el?.colorHex || '#94A3B8';
         const baseRadius = a.radius || el?.radius || 0.5;
-        const radius = viewMode === 'space_filling' ? baseRadius * 1.5 : baseRadius;
+        // In Ball-and-Stick mode: use 36% of base radius so spherical balls do not collide
+        // In Space-Filling mode: use 115% of base radius to touch Van der Waals surfaces
+        const radius = viewMode === 'space_filling' ? baseRadius * 1.15 : baseRadius * 0.36;
         return {
           element: a.element,
-          position: a.position,
+          position: [
+            a.position[0] * posScale,
+            a.position[1] * posScale,
+            a.position[2] * posScale
+          ],
           color,
           radius
         };
@@ -173,48 +181,49 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
       });
 
       const n = flatList.length;
+      const sphereScale = viewMode === 'space_filling' ? 1.15 : 0.36;
       if (n === 1) {
         const el = BUILDER_ELEMENTS_MAP.get(flatList[0]);
         atomData.push({
           element: flatList[0],
           position: [0, 0, 0],
           color: el?.colorHex || '#94A3B8',
-          radius: (el?.radius || 0.5) * (viewMode === 'space_filling' ? 1.5 : 1)
+          radius: (el?.radius || 0.5) * sphereScale
         });
       } else if (n === 2) {
         const el0 = BUILDER_ELEMENTS_MAP.get(flatList[0]);
         const el1 = BUILDER_ELEMENTS_MAP.get(flatList[1]);
-        const mult = viewMode === 'space_filling' ? 1.5 : 1;
+        const dist = viewMode === 'space_filling' ? 1.5 : 2.4;
         atomData.push({
           element: flatList[0],
-          position: [-0.7, 0, 0],
+          position: [-dist / 2, 0, 0],
           color: el0?.colorHex || '#94A3B8',
-          radius: (el0?.radius || 0.5) * mult
+          radius: (el0?.radius || 0.5) * sphereScale
         });
         atomData.push({
           element: flatList[1],
-          position: [0.7, 0, 0],
+          position: [dist / 2, 0, 0],
           color: el1?.colorHex || '#94A3B8',
-          radius: (el1?.radius || 0.5) * mult
+          radius: (el1?.radius || 0.5) * sphereScale
         });
         bondData.push({ from: 0, to: 1, order: 1 });
       } else {
-        // Star or spiral distribution around the primary core atom
+        // Star or spiral distribution around the primary core atom with spacious bonds
         const centerEl = BUILDER_ELEMENTS_MAP.get(flatList[0]);
-        const mult = viewMode === 'space_filling' ? 1.5 : 1;
         atomData.push({
           element: flatList[0],
           position: [0, 0, 0],
           color: centerEl?.colorHex || '#94A3B8',
-          radius: (centerEl?.radius || 0.6) * mult
+          radius: (centerEl?.radius || 0.6) * sphereScale
         });
 
         const orbitCount = n - 1;
         for (let i = 1; i < n; i++) {
           const el = BUILDER_ELEMENTS_MAP.get(flatList[i]);
           const angle = ((i - 1) / orbitCount) * Math.PI * 2;
-          const zOffset = Math.sin(angle * 2) * 0.4;
-          const dist = 1.15;
+          const zOffset = Math.sin(angle * 2) * 0.65;
+          // Spacious 2.4 units distance ensures long, beautifully visible rods/sticks
+          const dist = viewMode === 'space_filling' ? 1.6 : 2.45;
           const pos: [number, number, number] = [
             Math.cos(angle) * dist,
             Math.sin(angle) * dist,
@@ -224,7 +233,7 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
             element: flatList[i],
             position: pos,
             color: el?.colorHex || '#94A3B8',
-            radius: (el?.radius || 0.4) * mult
+            radius: (el?.radius || 0.45) * sphereScale
           });
           bondData.push({ from: 0, to: i, order: 1 });
         }
@@ -249,6 +258,8 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
 
     // 2. Bonds (only in ball-and-stick mode)
     if (viewMode === 'ball_and_stick' && bondData.length > 0) {
+      const yAxis = new THREE.Vector3(0, 1, 0);
+
       bondData.forEach((bond) => {
         const fromAtom = atomData[bond.from];
         const toAtom = atomData[bond.to];
@@ -257,39 +268,78 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
         const p1 = new THREE.Vector3(...fromAtom.position);
         const p2 = new THREE.Vector3(...toAtom.position);
         const distance = p1.distanceTo(p2);
+        if (distance < 0.001) return;
+
         const direction = new THREE.Vector3().subVectors(p2, p1).normalize();
 
-        const renderCylinder = (offset = new THREE.Vector3(0, 0, 0), radius = 0.08) => {
-          const cylinderGeom = new THREE.CylinderGeometry(radius, radius, distance, 16);
+        // Calculate a stable perpendicular vector for parallel multiple bonds
+        let refUp = new THREE.Vector3(0, 1, 0);
+        if (Math.abs(direction.dot(refUp)) > 0.85) {
+          refUp = new THREE.Vector3(1, 0, 0);
+        }
+        const perp = new THREE.Vector3().crossVectors(direction, refUp).normalize();
+
+        // Helper to render half-segments (dual-color split) or unified cylinder
+        const renderCylinderSegment = (
+          startPos: THREE.Vector3,
+          segDistance: number,
+          colorHex: string,
+          radius: number,
+          emissiveGlow: boolean = false
+        ) => {
+          const cylinderGeom = new THREE.CylinderGeometry(radius, radius, segDistance, 20);
           const cylinderMat = new THREE.MeshStandardMaterial({
-            color: isDark ? 0x94a3b8 : 0x64748b,
-            roughness: 0.4,
-            metalness: 0.2
+            color: new THREE.Color(colorHex),
+            roughness: emissiveGlow ? 0.1 : 0.35,
+            metalness: emissiveGlow ? 0.1 : 0.25,
+            emissive: emissiveGlow ? new THREE.Color(colorHex) : new THREE.Color(0x000000),
+            emissiveIntensity: emissiveGlow ? 0.7 : 0
           });
-          const cylinder = new THREE.Mesh(cylinderGeom, cylinderMat);
+          const cylinderMesh = new THREE.Mesh(cylinderGeom, cylinderMat);
 
-          const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5).add(offset);
-          cylinder.position.copy(midPoint);
+          // Center of this half segment
+          cylinderMesh.position.copy(startPos);
+          // Standard Three.js cylinder orientation using quaternions
+          cylinderMesh.quaternion.setFromUnitVectors(yAxis, direction);
 
-          const orientation = new THREE.Matrix4();
-          orientation.lookAt(p1, p2, new THREE.Vector3(0, 1, 0));
-          orientation.multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-          cylinder.applyMatrix4(orientation);
+          group.add(cylinderMesh);
+        };
 
-          group.add(cylinder);
+        const renderBondPair = (offsetVector: THREE.Vector3 = new THREE.Vector3(0, 0, 0), radius: number = 0.08) => {
+          const midPoint = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5).add(offsetVector);
+          const halfDist = distance * 0.5;
+
+          if (bondStyle === 'split_color') {
+            // Half 1: from p1 towards midPoint
+            const center1 = new THREE.Vector3().addVectors(p1, midPoint).multiplyScalar(0.5);
+            renderCylinderSegment(center1, halfDist, fromAtom.color, radius, false);
+
+            // Half 2: from midPoint towards p2
+            const center2 = new THREE.Vector3().addVectors(midPoint, p2).multiplyScalar(0.5);
+            renderCylinderSegment(center2, halfDist, toAtom.color, radius, false);
+          } else if (bondStyle === 'glowing') {
+            const glowColor = '#38bdf8';
+            renderCylinderSegment(midPoint, distance, glowColor, radius * 1.1, true);
+          } else {
+            // Classic metallic grey
+            const classicColor = isDark ? '#94a3b8' : '#64748b';
+            renderCylinderSegment(midPoint, distance, classicColor, radius, false);
+          }
         };
 
         if (bond.order === 1) {
-          renderCylinder(new THREE.Vector3(0, 0, 0), 0.08);
+          renderBondPair(new THREE.Vector3(0, 0, 0), 0.095);
         } else if (bond.order === 2) {
-          const perp = new THREE.Vector3(-direction.y, direction.x, 0).normalize().multiplyScalar(0.09);
-          renderCylinder(perp, 0.06);
-          renderCylinder(perp.clone().negate(), 0.06);
+          const offsetDist = 0.11;
+          const off1 = perp.clone().multiplyScalar(offsetDist);
+          const off2 = perp.clone().multiplyScalar(-offsetDist);
+          renderBondPair(off1, 0.072);
+          renderBondPair(off2, 0.072);
         } else if (bond.order === 3) {
-          const perp = new THREE.Vector3(-direction.y, direction.x, 0).normalize().multiplyScalar(0.12);
-          renderCylinder(new THREE.Vector3(0, 0, 0), 0.05);
-          renderCylinder(perp, 0.05);
-          renderCylinder(perp.clone().negate(), 0.05);
+          const offsetDist = 0.14;
+          renderBondPair(new THREE.Vector3(0, 0, 0), 0.06);
+          renderBondPair(perp.clone().multiplyScalar(offsetDist), 0.06);
+          renderBondPair(perp.clone().multiplyScalar(-offsetDist), 0.06);
         }
       });
     }
@@ -304,7 +354,7 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
       const targetZ = Math.max(5, sphere.radius * 2.8) / zoomLevel;
       cameraRef.current.position.z = targetZ;
     }
-  }, [compound, elementCounts, viewMode, isDark, zoomLevel]);
+  }, [compound, elementCounts, viewMode, isDark, zoomLevel, bondStyle]);
 
   // Handle Drag to Rotate
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -377,10 +427,24 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-300 font-medium px-1">
-          {viewMode === 'ball_and_stick' 
-            ? t('نموذج الكرات والعصي (Ball-and-Stick)', 'Ball-and-Stick Model') 
-            : t('نموذج التعبئة الفضائية (Space-Filling / Van der Waals)', 'Space-Filling Model')}
+        <p className="text-xs text-slate-300 font-medium px-1 flex items-center gap-1.5 flex-wrap">
+          <span>
+            {viewMode === 'ball_and_stick' 
+              ? t('نموذج الكرات والعصي', 'Ball-and-Stick Model') 
+              : t('نموذج التعبئة الفضائية', 'Space-Filling Model')}
+          </span>
+          {viewMode === 'ball_and_stick' && (
+            <>
+              <span className="text-slate-500">·</span>
+              <span className="text-cyan-400 font-semibold">
+                {bondStyle === 'split_color'
+                  ? t('روابط ملونة للذرات', 'Atom-colored Bonds')
+                  : bondStyle === 'glowing'
+                  ? t('روابط متوهجة', 'Glowing Bonds')
+                  : t('روابط كلاسيكية', 'Classic Bonds')}
+              </span>
+            </>
+          )}
         </p>
       </div>
 
@@ -407,6 +471,33 @@ export const MoleculeViewer3D: React.FC<MoleculeViewer3DProps> = ({
         >
           <Layers className="w-4 h-4" />
         </button>
+
+        {viewMode === 'ball_and_stick' && (
+          <button
+            type="button"
+            onClick={() => {
+              const styles: ('split_color' | 'classic' | 'glowing')[] = ['split_color', 'classic', 'glowing'];
+              const nextIndex = (styles.indexOf(bondStyle) + 1) % styles.length;
+              setBondStyle(styles[nextIndex]);
+            }}
+            className={`p-2 rounded-xl transition-all ${
+              bondStyle === 'split_color'
+                ? 'text-cyan-400 bg-cyan-950/60 border border-cyan-500/40 shadow-xs'
+                : bondStyle === 'glowing'
+                ? 'text-amber-400 bg-amber-950/60 border border-amber-500/40 shadow-xs'
+                : 'text-slate-300 hover:text-cyan-400 hover:bg-slate-800'
+            }`}
+            title={
+              bondStyle === 'split_color'
+                ? t('نمط الروابط: تدرج ألوان الذرات (PyMOL)', 'Bond Style: Atom Split Colors')
+                : bondStyle === 'glowing'
+                ? t('نمط الروابط: توهج السحابة الإلكترونية', 'Bond Style: Glowing Electron Cloud')
+                : t('نمط الروابط: كلاسيكي معدني', 'Bond Style: Classic Metallic')
+            }
+          >
+            <Palette className="w-4 h-4" />
+          </button>
+        )}
 
         <div className="w-[1px] h-5 bg-slate-700/80 mx-1" />
 
