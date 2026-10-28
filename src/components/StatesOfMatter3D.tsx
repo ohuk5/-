@@ -433,11 +433,41 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
           mol.add(hMesh);
         });
         return { mesh: mol, radius: 0.66 };
-      } else if (substance.particleType === 'diatomic') {
-        // O2, N2, Br2 Diatomic Dumbbell with bond cylinder
+      } else if (substance.particleType === 'ammonia') {
+        // NH3 Molecule: Central Nitrogen + 3 Hydrogens in Trigonal Pyramid
         const mol = new THREE.Group();
-        const aGeo = new THREE.SphereGeometry(0.38, 14, 14);
-        const aMat = new THREE.MeshStandardMaterial({ color: subColor, roughness: 0.25, metalness: 0.15 });
+        const nGeo = new THREE.SphereGeometry(0.44, 16, 16);
+        const nMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.22, metalness: 0.15 });
+        mol.add(new THREE.Mesh(nGeo, nMat));
+
+        const hGeo = new THREE.SphereGeometry(0.24, 12, 12);
+        const hMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.2 });
+        const bondDist = 0.52;
+        const bondAngle = (107.8 * Math.PI) / 180;
+
+        for (let k = 0; k < 3; k++) {
+          const phi = (k * 2 * Math.PI) / 3;
+          const hx = Math.sin(bondAngle * 0.5) * Math.cos(phi) * bondDist;
+          const hz = Math.sin(bondAngle * 0.5) * Math.sin(phi) * bondDist;
+          const hy = -Math.cos(bondAngle * 0.5) * bondDist;
+
+          const hyd = new THREE.Mesh(hGeo, hMat);
+          hyd.position.set(hx, hy, hz);
+          mol.add(hyd);
+
+          const cylGeo = new THREE.CylinderGeometry(0.06, 0.06, bondDist, 8);
+          const cyl = new THREE.Mesh(cylGeo, bondCylMat);
+          cyl.position.set(hx * 0.5, hy * 0.5, hz * 0.5);
+          cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(hx, hy, hz).normalize());
+          mol.add(cyl);
+        }
+
+        return { mesh: mol, radius: 0.65 };
+      } else if (substance.particleType === 'diatomic') {
+        // O2, N2, Br2, Cl2, I2, H2 Diatomic Dumbbell with bond cylinder
+        const mol = new THREE.Group();
+        const aGeo = new THREE.SphereGeometry(0.38, 16, 16);
+        const aMat = new THREE.MeshStandardMaterial({ color: subColor, roughness: 0.22, metalness: 0.15 });
         const a1 = new THREE.Mesh(aGeo, aMat);
         a1.position.x = 0.34;
         mol.add(a1);
@@ -450,25 +480,29 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         mol.add(new THREE.Mesh(bGeo, bondCylMat));
         return { mesh: mol, radius: 0.62 };
       } else if (substance.particleType === 'metallic') {
-        // Metallic Sphere (Hg, Fe, Au, Ga, Ti)
-        const geo = new THREE.SphereGeometry(0.48, 18, 18);
+        // High-Fidelity PBR Metallic Sphere (Au, Ag, Cu, Fe, Pb, Al, Na, W, Ti, Ga, Hg)
+        const isGold = substance.id === 'gold';
+        const isSilver = substance.id === 'silver';
+        const isLead = substance.id === 'lead';
+        const isCopper = substance.id === 'copper';
+        const isSodium = substance.id === 'sodium';
+
+        const geo = new THREE.SphereGeometry(0.48, 22, 22);
         const mat = new THREE.MeshStandardMaterial({
-          color: subColor,
-          metalness: 0.92,
-          roughness: 0.16,
-          emissive: new THREE.Color(0x000000),
-          emissiveIntensity: 0
+          color: isGold ? 0xfacc15 : isSilver ? 0xf8fafc : isCopper ? 0xea580c : isLead ? 0x64748b : isSodium ? 0xfef08a : subColor,
+          metalness: isLead ? 0.75 : 0.96,
+          roughness: isSilver ? 0.08 : isGold ? 0.12 : isLead ? 0.40 : 0.15
         });
         return { mesh: new THREE.Mesh(geo, mat), radius: 0.52 };
       } else {
-        // Monatomic Noble Gas (He, Ne, Ar, Xe)
-        const geo = new THREE.SphereGeometry(0.45, 16, 16);
+        // Monatomic Noble Gas (He, Ne, Ar, Xe) or Carbon
+        const geo = new THREE.SphereGeometry(0.45, 18, 18);
         const mat = new THREE.MeshStandardMaterial({
           color: subColor,
-          roughness: 0.22,
+          roughness: 0.20,
           metalness: 0.1,
           emissive: subColor,
-          emissiveIntensity: 0.18
+          emissiveIntensity: 0.22
         });
         return { mesh: new THREE.Mesh(geo, mat), radius: 0.5 };
       }
@@ -730,15 +764,23 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
           }
 
           // Ensure every gas molecule has a healthy 3D vertical velocity component so it traverses the full chamber height
-          if (Math.abs(p.vy) < targetGasSpeed * 0.22) {
-            p.vy = (p.vy >= 0 ? 1 : -1) * targetGasSpeed * (0.35 + Math.random() * 0.25);
+          const effectiveGasSpeed = curPhase === 'plasma' ? targetGasSpeed * 1.75 : targetGasSpeed;
+          if (Math.abs(p.vy) < effectiveGasSpeed * 0.22) {
+            p.vy = (p.vy >= 0 ? 1 : -1) * effectiveGasSpeed * (0.35 + Math.random() * 0.25);
           }
 
           const currentSpeed = Math.sqrt(p.vx * p.vx + p.vy * p.vy + p.vz * p.vz) || 0.01;
-          const newSpeed = currentSpeed + (targetGasSpeed - currentSpeed) * 0.12;
+          const newSpeed = currentSpeed + (effectiveGasSpeed - currentSpeed) * 0.12;
           p.vx = (p.vx / currentSpeed) * newSpeed;
           p.vy = (p.vy / currentSpeed) * newSpeed;
           p.vz = (p.vz / currentSpeed) * newSpeed;
+
+          // In plasma, add slight electromagnetic jitter
+          if (curPhase === 'plasma') {
+            p.vx += (Math.random() - 0.5) * 0.04;
+            p.vy += (Math.random() - 0.5) * 0.04;
+            p.vz += (Math.random() - 0.5) * 0.04;
+          }
 
           p.x += p.vx;
           p.y += p.vy;
@@ -868,8 +910,9 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         ? (lineSegmentMesh.geometry.attributes.position.array as Float32Array)
         : null;
 
-      const showBonds = curPhase === 'solid' || curPhase === 'melting' || curPhase === 'liquid';
-      const maxBondDistSq = curPhase === 'solid' ? 2.6 : curPhase === 'melting' ? 2.9 : 2.3;
+      const isPlasma = curPhase === 'plasma';
+      const showBonds = curPhase === 'solid' || curPhase === 'melting' || curPhase === 'liquid' || isPlasma;
+      const maxBondDistSq = curPhase === 'solid' ? 2.6 : curPhase === 'melting' ? 2.9 : isPlasma ? 7.5 : 2.3;
 
       for (let i = 0; i < n; i++) {
         const p = particles[i];
@@ -881,8 +924,19 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         p.mesh.position.set(p.x, p.y, p.z);
         p.mesh.rotation.set(p.rotX, p.rotY, p.rotZ);
 
+        // In plasma mode, pulse glowing purple/cyan ionization aura
+        if (isPlasma) {
+          p.mesh.traverse(child => {
+            if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+              child.material.emissive.setHex(0xa855f7);
+              child.material.emissiveIntensity = 1.6;
+            }
+          });
+        }
+
         if (showBonds && posArray && segCount < maxBondSegments) {
-          for (let j = i + 1; j < n; j++) {
+          const checkLimit = isPlasma ? Math.min(i + 4, n) : n;
+          for (let j = i + 1; j < checkLimit; j++) {
             if (segCount >= maxBondSegments) break;
             const p2 = particles[j];
             const dx = p2.x - p.x;
@@ -907,7 +961,13 @@ export const StatesOfMatter3D: React.FC<StatesOfMatter3DProps> = ({
         lineSegmentMesh.geometry.setDrawRange(0, segCount * 2);
         lineSegmentMesh.geometry.attributes.position.needsUpdate = true;
         if (lineSegmentMesh.material instanceof THREE.LineBasicMaterial) {
-          lineSegmentMesh.material.opacity = curPhase === 'solid' ? 0.42 : curPhase === 'melting' ? 0.28 : 0.16;
+          if (isPlasma) {
+            lineSegmentMesh.material.color.setHex(0xc084fc);
+            lineSegmentMesh.material.opacity = 0.85;
+          } else {
+            lineSegmentMesh.material.color.setHex(0x38bdf8);
+            lineSegmentMesh.material.opacity = curPhase === 'solid' ? 0.42 : curPhase === 'melting' ? 0.28 : 0.16;
+          }
         }
       }
 

@@ -28,6 +28,12 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { LabViewer3D } from './LabViewer3D';
+import { BuretteTitrationModule } from './BuretteTitrationModule';
+import { PneumaticGasTrough } from './PneumaticGasTrough';
+import { DigitalLabScale } from './DigitalLabScale';
+import { GraduatedCylinderPipette } from './GraduatedCylinderPipette';
+import { TestTubeRackModule } from './TestTubeRackModule';
+import { SpectrometerDischargeModule } from './SpectrometerDischargeModule';
 import { playLabSound, LabSoundType } from '../utils/soundEffects';
 
 // Reagent definition for safe chemical lab
@@ -697,7 +703,7 @@ interface BeakerContent {
 }
 
 export const ExperimentalLab: React.FC = () => {
-  const { lang, theme, t, activeLabPreset } = useApp();
+  const { lang, theme, t, activeLabPreset, activeApparatusStation, setActiveApparatusStation } = useApp();
   const isDark = theme === 'dark';
 
   // Mode: Guided Missions vs Open Sandbox
@@ -4616,7 +4622,222 @@ export const ExperimentalLab: React.FC = () => {
         </div>
       </div>
 
-      {/* Guided Mission Banner when in Guided Mode */}
+      {/* PhET Interactive Laboratory Apparatus Navigation Bar */}
+      <div className={`p-3 sm:p-4 rounded-2xl border shadow-md space-y-3 ${
+        isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200'
+      }`}>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-cyan-400" />
+            <h3 className={`text-xs sm:text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {t('مجموعة أجهزة وأدوات المعمل التفاعلية (PhET Laboratory Suite):', 'PhET Interactive Laboratory Apparatus Suite:')}
+            </h3>
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            {t('اختر أي جهاز للتجربة الحرة أو قياس الحجوم والأوزان بدقة', 'Select any instrument to experiment, titrate, or measure masses and volumes')}
+          </span>
+        </div>
+
+        {/* Apparatus Selector Tabs */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              playLabSound('click', isSoundMuted);
+              setActiveApparatusStation('main_workbench');
+            }}
+            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
+              activeApparatusStation === 'main_workbench'
+                ? 'bg-cyan-600 border-cyan-400 text-white shadow-md'
+                : isDark
+                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-cyan-500/50 hover:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-cyan-50'
+            }`}
+          >
+            <span className="text-xl">🧪</span>
+            <span className="leading-tight">{t('كأس التفاعلات والدليل', 'Main Reaction Beaker')}</span>
+            <span className="text-[9px] font-mono opacity-80">{t('المعمل الأساسي', 'Primary Lab')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playLabSound('click', isSoundMuted);
+              setActiveApparatusStation('burette_titration');
+            }}
+            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
+              activeApparatusStation === 'burette_titration'
+                ? 'bg-cyan-600 border-cyan-400 text-white shadow-md'
+                : isDark
+                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-cyan-500/50 hover:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-cyan-50'
+            }`}
+          >
+            <span className="text-xl">🎯</span>
+            <span className="leading-tight">{t('السحاحة ومقياس pH', 'Burette & pH Meter')}</span>
+            <span className="text-[9px] font-mono opacity-80">{t('معايرة ورسم منحنى', 'Titration Curve')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playLabSound('click', isSoundMuted);
+              setActiveApparatusStation('pneumatic_gas');
+            }}
+            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
+              activeApparatusStation === 'pneumatic_gas'
+                ? 'bg-blue-600 border-blue-400 text-white shadow-md'
+                : isDark
+                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-blue-500/50 hover:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50'
+            }`}
+          >
+            <span className="text-xl">🌊</span>
+            <span className="leading-tight">{t('حوض إزاحة الماء', 'Gas Collection Trough')}</span>
+            <span className="text-[9px] font-mono opacity-80">{t('تجميع وشظية مشتعلة', 'Pneumatic Basin')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playLabSound('click', isSoundMuted);
+              setActiveApparatusStation('digital_scale');
+            }}
+            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
+              activeApparatusStation === 'digital_scale'
+                ? 'bg-emerald-600 border-emerald-400 text-white shadow-md'
+                : isDark
+                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-emerald-500/50 hover:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-emerald-50'
+            }`}
+          >
+            <span className="text-xl">⚖️</span>
+            <span className="leading-tight">{t('الميزان الرقمي الحساس', 'Analytical Balance')}</span>
+            <span className="text-[9px] font-mono opacity-80">{t('تصفير ووزن 0.01g', 'Tare & Weighing')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playLabSound('click', isSoundMuted);
+              setActiveApparatusStation('cylinder_pipette');
+            }}
+            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
+              activeApparatusStation === 'cylinder_pipette'
+                ? 'bg-teal-600 border-teal-400 text-white shadow-md'
+                : isDark
+                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-teal-500/50 hover:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-teal-50'
+            }`}
+          >
+            <span className="text-xl">💧</span>
+            <span className="leading-tight">{t('المخبار المدرج والماصة', 'Cylinder & Pipette')}</span>
+            <span className="text-[9px] font-mono opacity-80">{t('سطح مقعر Meniscus', 'Volume Transfer')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playLabSound('click', isSoundMuted);
+              setActiveApparatusStation('test_tube_rack');
+            }}
+            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
+              activeApparatusStation === 'test_tube_rack'
+                ? 'bg-indigo-600 border-indigo-400 text-white shadow-md'
+                : isDark
+                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-indigo-500/50 hover:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-indigo-50'
+            }`}
+          >
+            <span className="text-xl">🧪</span>
+            <span className="leading-tight">{t('حامل أنابيب الاختبار', 'Test Tube Rack')}</span>
+            <span className="text-[9px] font-mono opacity-80">{t('4 أنابيب ورواسب', 'Multi-Tube Reactions')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              playLabSound('click', isSoundMuted);
+              setActiveApparatusStation('spectrometer_discharge');
+            }}
+            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center gap-1.5 text-center ${
+              activeApparatusStation === 'spectrometer_discharge'
+                ? 'bg-purple-600 border-purple-400 text-white shadow-md'
+                : isDark
+                ? 'bg-slate-950 border-slate-800 text-slate-300 hover:border-purple-500/50 hover:bg-slate-900'
+                : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-purple-50'
+            }`}
+          >
+            <span className="text-xl">🌈</span>
+            <span className="leading-tight">{t('مطياف الانبعاث والتفريغ', 'Spectrometer & Discharge')}</span>
+            <span className="text-[9px] font-mono opacity-80">{t('طيف الانبعاث E=hc/λ', 'Atomic Spectra & Prism')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Render Selected Apparatus Station or Main Workbench */}
+      {activeApparatusStation !== 'main_workbench' ? (
+        <div className="space-y-4 animate-fadeIn">
+          <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-xl p-3">
+            <button
+              onClick={() => {
+                playLabSound('click', isSoundMuted);
+                setActiveApparatusStation('main_workbench');
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-colors"
+            >
+              <span>←</span>
+              <span>{t('العودة إلى كأس التفاعلات والدليل الرئيسي', 'Back to Main Beaker & Reaction Guide')}</span>
+            </button>
+            <span className="text-xs text-slate-400 font-medium">
+              {activeApparatusStation === 'burette_titration' && t('محطة المعايرة الحجمية بالسحاحة ومقياس pH', 'Burette Titration & Digital pH')}
+              {activeApparatusStation === 'pneumatic_gas' && t('محطة تجميع الغازات بإزاحة الماء', 'Pneumatic Gas Collection Trough')}
+              {activeApparatusStation === 'digital_scale' && t('الميزان الرقمي التحليلي الحساس (0.01g)', 'Precision Analytical Balance')}
+              {activeApparatusStation === 'cylinder_pipette' && t('المخبار المدرج والماصة الدقيقة', 'Graduated Cylinder & Pipette')}
+              {activeApparatusStation === 'test_tube_rack' && t('حامل أنابيب الاختبار المتعدد (4 أنابيب)', 'Multi-Tube Test Rack')}
+              {activeApparatusStation === 'spectrometer_discharge' && t('محطة مطياف الانبعاث الضوئي وأنبوب التفريغ الكهربائي', 'Optical Emission Spectrometer & Gas Discharge Tube')}
+            </span>
+          </div>
+
+          {activeApparatusStation === 'burette_titration' && (
+            <BuretteTitrationModule soundEnabled={!isSoundMuted} onClose={() => setActiveApparatusStation('main_workbench')} />
+          )}
+
+          {activeApparatusStation === 'pneumatic_gas' && (
+            <PneumaticGasTrough soundEnabled={!isSoundMuted} />
+          )}
+
+          {activeApparatusStation === 'digital_scale' && (
+            <DigitalLabScale
+              soundEnabled={!isSoundMuted}
+              onTransferSample={(reagentId, massG) => {
+                handleAddReagent(reagentId, massG);
+                setActiveApparatusStation('main_workbench');
+              }}
+            />
+          )}
+
+          {activeApparatusStation === 'cylinder_pipette' && (
+            <GraduatedCylinderPipette
+              soundEnabled={!isSoundMuted}
+              onTransferLiquid={(reagentId, volMl) => {
+                handleAddReagent(reagentId, volMl);
+                setActiveApparatusStation('main_workbench');
+              }}
+            />
+          )}
+
+          {activeApparatusStation === 'test_tube_rack' && (
+            <TestTubeRackModule soundEnabled={!isSoundMuted} />
+          )}
+
+          {activeApparatusStation === 'spectrometer_discharge' && (
+            <SpectrometerDischargeModule soundEnabled={!isSoundMuted} onClose={() => setActiveApparatusStation('main_workbench')} />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Guided Mission Banner when in Guided Mode */}
       {labMode === 'guided' && (
         <div className={`p-4 rounded-2xl border space-y-3 shadow-md ${
           isDark ? 'bg-slate-900 border-cyan-500/40' : 'bg-white border-cyan-200'
@@ -5850,6 +6071,8 @@ export const ExperimentalLab: React.FC = () => {
         </div>
         </div>
       </div>
+      </div>
+      )}
     </div>
   );
 };

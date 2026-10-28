@@ -1,14 +1,58 @@
-import React from 'react';
-import { Atom, Flame, Radiation, BookOpen, FlaskConical, Sun, Moon, Globe2, Volume2, VolumeX } from 'lucide-react';
-import { useApp, ActiveTabType } from '../context/AppContext';
+import React, { useEffect } from 'react';
+import { Atom, Flame, Radiation, BookOpen, FlaskConical, Sun, Moon, Globe2, Volume2, VolumeX, Sparkles, Network } from 'lucide-react';
+import { useApp, ActiveTabType, ApparatusStationType } from '../context/AppContext';
 
 interface HeaderProps {
   onOpenGuide: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
-  const { lang, toggleLang, theme, toggleTheme, soundEnabled, toggleSound, t, activeTab, setActiveTab } = useApp();
+  const {
+    lang,
+    toggleLang,
+    theme,
+    toggleTheme,
+    soundEnabled,
+    toggleSound,
+    t,
+    activeTab,
+    setActiveTab,
+    activeApparatusStation,
+    setActiveApparatusStation
+  } = useApp();
   const isDark = theme === 'dark';
+
+  // Global Keyboard Navigation Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+      if (e.key === '1') {
+        setActiveTab('atom-builder');
+      } else if (e.key === '2') {
+        setActiveTab('molecule-builder');
+      } else if (e.key === '3') {
+        setActiveTab('states-of-matter');
+      } else if (e.key === '4') {
+        setActiveTab('radioactive-decay');
+      } else if (e.key === '5') {
+        setActiveTab('experiments-lab');
+      } else if (e.key === 't' || e.key === 'T') {
+        toggleTheme();
+      } else if (e.key === 'l' || e.key === 'L') {
+        toggleLang();
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleSound();
+      } else if (e.key === '?' || e.key === 'g' || e.key === 'G') {
+        onOpenGuide();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [setActiveTab, toggleTheme, toggleLang, toggleSound, onOpenGuide]);
 
   const navItems: { id: ActiveTabType; num: string; labelAr: string; labelEn: string; shortAr: string; shortEn: string; icon: React.ReactNode }[] = [
     {
@@ -21,8 +65,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
       icon: <Atom className="w-4 h-4 shrink-0" />
     },
     {
-      id: 'states-of-matter',
+      id: 'molecule-builder',
       num: '02',
+      labelAr: 'تكوين المركبات',
+      labelEn: 'Molecule Builder',
+      shortAr: 'المركبات',
+      shortEn: 'Molecules',
+      icon: <Network className="w-4 h-4 shrink-0" />
+    },
+    {
+      id: 'states-of-matter',
+      num: '03',
       labelAr: 'حالات المادة والديناميكا',
       labelEn: 'States of Matter',
       shortAr: 'الحالات',
@@ -31,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
     },
     {
       id: 'radioactive-decay',
-      num: '03',
+      num: '04',
       labelAr: 'النشاط الإشعاعي وعمر النصف',
       labelEn: 'Radioactive Decay',
       shortAr: 'الإشعاع',
@@ -40,7 +93,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
     },
     {
       id: 'experiments-lab',
-      num: '04',
+      num: '05',
       labelAr: 'معمل التجارب التفاعلي',
       labelEn: 'Experimental Lab',
       shortAr: 'المعمل',
@@ -51,22 +104,22 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
 
   return (
     <header
-      className={`sticky top-0 z-40 w-full max-w-full backdrop-blur-md border-b px-3 sm:px-6 py-2.5 transition-colors ${
-        isDark ? 'bg-slate-950/95 border-slate-800/90' : 'bg-white/95 border-slate-200 shadow-xs'
+      className={`sticky top-0 z-40 w-full max-w-full backdrop-blur-md border-b px-4 sm:px-8 py-3.5 transition-colors ${
+        isDark ? 'bg-slate-950/95 border-slate-800/90 shadow-md' : 'bg-white/95 border-slate-200/90 shadow-sm'
       }`}
     >
-      <div className="max-w-7xl mx-auto flex flex-col xl:flex-row items-center justify-between gap-2.5">
+      <div className="max-w-7xl mx-auto flex flex-col xl:flex-row items-center justify-between gap-3.5">
         {/* Zone 1: Brand Wordmark + Mobile Actions */}
-        <div className="flex items-center justify-between w-full xl:w-auto gap-3 min-w-0">
+        <div className="flex items-center justify-between w-full xl:w-auto gap-4 min-w-0">
           <button
             type="button"
             onClick={() => setActiveTab('atom-builder')}
-            className="flex items-center gap-2.5 min-w-0 text-start group focus:outline-none"
+            className="flex items-center gap-3 min-w-0 text-start group focus:outline-none"
           >
-            <div className="w-9 h-9 rounded-xl bg-cyan-600 flex items-center justify-center text-white shadow-xs shrink-0 group-hover:bg-cyan-500 transition-colors">
+            <div className="w-10 h-10 rounded-2xl bg-cyan-600 flex items-center justify-center text-white shadow-md shrink-0 group-hover:bg-cyan-500 transition-colors">
               <Atom className="w-5 h-5" />
             </div>
-            <span className={`text-sm sm:text-base font-extrabold tracking-tight truncate whitespace-nowrap ${
+            <span className={`text-base sm:text-lg font-black tracking-tight truncate whitespace-nowrap ${
               isDark ? 'text-slate-100' : 'text-slate-900'
             }`}>
               {t('مختبر الفيزياء والكيمياء التفاعلي', 'Interactive Physics & Chemistry Lab')}
@@ -74,11 +127,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
           </button>
 
           {/* Mobile & Tablet Utility Actions */}
-          <div className="flex items-center gap-1.5 xl:hidden shrink-0">
+          <div className="flex items-center gap-2 xl:hidden shrink-0">
             <button
               type="button"
               onClick={toggleSound}
-              className={`p-2 rounded-xl border transition-colors ${
+              className={`p-2.5 rounded-xl border transition-colors ${
                 soundEnabled
                   ? isDark ? 'bg-slate-900 border-slate-800 text-cyan-400' : 'bg-slate-100 border-slate-200 text-cyan-700'
                   : isDark ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-200 text-slate-400'
@@ -91,7 +144,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
             <button
               type="button"
               onClick={toggleTheme}
-              className={`p-2 rounded-xl border transition-colors ${
+              className={`p-2.5 rounded-xl border transition-colors ${
                 isDark ? 'bg-slate-900 border-slate-800 text-amber-400' : 'bg-slate-100 border-slate-200 text-slate-700'
               }`}
               title={t('تبديل المظهر', 'Toggle Theme')}
@@ -102,19 +155,19 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
             <button
               type="button"
               onClick={toggleLang}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1 whitespace-nowrap ${
+              className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 whitespace-nowrap ${
                 isDark ? 'bg-slate-900 border-slate-800 text-cyan-400' : 'bg-slate-100 border-slate-200 text-cyan-700'
               }`}
               title={t('تبديل اللغة', 'Switch Language')}
             >
-              <Globe2 className="w-3.5 h-3.5" />
+              <Globe2 className="w-4 h-4" />
               <span>{lang === 'ar' ? 'EN' : 'عربي'}</span>
             </button>
 
             <button
               type="button"
               onClick={onOpenGuide}
-              className={`p-2 rounded-xl border transition-colors ${
+              className={`p-2.5 rounded-xl border transition-colors ${
                 isDark ? 'bg-cyan-950/60 border-cyan-800/60 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-700'
               }`}
               title={t('الموسوعة والدليل العلمي', 'Scientific Guide')}
@@ -127,7 +180,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
         {/* Zone 2: Unified Scientific Module Navigation */}
         <nav
           aria-label="Primary Simulation Modules"
-          className={`w-full xl:w-auto grid grid-cols-4 sm:flex items-center justify-center gap-1 p-1 rounded-xl border ${
+          className={`w-full xl:w-auto flex items-center justify-start xl:justify-center gap-1.5 p-1.5 rounded-2xl border overflow-x-auto scrollbar-none ${
             isDark ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200/90'
           }`}
         >
@@ -138,23 +191,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveTab(item.id)}
-                className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3.5 py-1.5 rounded-lg font-bold transition-all text-[11px] sm:text-xs min-w-0 whitespace-nowrap ${
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl font-bold transition-all text-xs sm:text-sm whitespace-nowrap shrink-0 ${
                   isActive
-                    ? 'bg-cyan-600 text-white shadow-xs'
+                    ? 'bg-cyan-600 text-white shadow-md'
                     : isDark
-                    ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                    ? 'text-slate-300 hover:text-white hover:bg-slate-800/80'
+                    : 'text-slate-700 hover:text-slate-950 hover:bg-white'
                 }`}
               >
-                <span className={isActive ? 'text-white' : 'text-cyan-500'}>{item.icon}</span>
-                <span className="truncate">
-                  <span className="inline sm:hidden">{t(item.shortAr, item.shortEn)}</span>
-                  <span className="hidden sm:inline">
-                    <span className={`font-mono text-[10px] me-1 ${isActive ? 'text-cyan-100' : 'text-slate-500'}`}>
-                      {item.num}.
-                    </span>
-                    {t(item.labelAr, item.labelEn)}
+                <span className={isActive ? 'text-white' : 'text-cyan-400'}>{item.icon}</span>
+                <span>
+                  <span className={`font-mono text-xs me-1.5 ${isActive ? 'text-cyan-100' : 'text-slate-400'}`}>
+                    {item.num}.
                   </span>
+                  {t(item.labelAr, item.labelEn)}
                 </span>
               </button>
             );
@@ -162,29 +212,29 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
         </nav>
 
         {/* Zone 3: Desktop Global Utility Actions */}
-        <div className="hidden xl:flex items-center gap-2 shrink-0">
+        <div className="hidden xl:flex items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={toggleSound}
-            className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
+            className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
               soundEnabled
                 ? isDark
                   ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-cyan-400'
                   : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-cyan-700'
                 : isDark
-                ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-500'
-                : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-400'
+                ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-400'
+                : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-500'
             }`}
             title={soundEnabled ? t('كتم الصوت', 'Mute Audio') : t('تشغيل الصوت', 'Unmute Audio')}
           >
-            {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             <span>{soundEnabled ? t('الصوت مفعل', 'Audio On') : t('صامت', 'Muted')}</span>
           </button>
 
           <button
             type="button"
             onClick={toggleTheme}
-            className={`p-2 rounded-xl border transition-all ${
+            className={`p-2.5 rounded-xl border transition-all ${
               isDark
                 ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-amber-400'
                 : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
@@ -197,27 +247,70 @@ export const Header: React.FC<HeaderProps> = ({ onOpenGuide }) => {
           <button
             type="button"
             onClick={toggleLang}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all whitespace-nowrap ${
+            className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap ${
               isDark
                 ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
                 : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
             }`}
             title={t('تبديل اللغة', 'Switch Language')}
           >
-            <Globe2 className="w-3.5 h-3.5 text-cyan-500" />
+            <Globe2 className="w-4 h-4 text-cyan-500" />
             <span>{lang === 'ar' ? 'English' : 'عربي'}</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenGuide}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-xs whitespace-nowrap"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all shadow-md whitespace-nowrap"
           >
-            <BookOpen className="w-3.5 h-3.5" />
+            <BookOpen className="w-4 h-4" />
             <span>{t('الدليل العلمي', 'Science Guide')}</span>
           </button>
         </div>
       </div>
+
+      {/* Quick Apparatus Suite Sub-Bar when Experimental Lab is active */}
+      {activeTab === 'experiments-lab' && (
+        <div className={`mt-2 pt-2 border-t max-w-7xl mx-auto flex items-center justify-between gap-2 overflow-x-auto scrollbar-none pb-0.5 ${
+          isDark ? 'border-slate-800/80' : 'border-slate-200'
+        }`}>
+          <div className="flex items-center gap-1.5 shrink-0 text-[11px] font-bold text-cyan-500">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{t('محطات وأجهزة المعمل:', 'Lab Apparatus Stations:')}</span>
+          </div>
+
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5">
+            {[
+              { id: 'main_workbench', labelAr: 'كأس التفاعلات والدليل', labelEn: 'Reaction Beaker', icon: '🧪' },
+              { id: 'burette_titration', labelAr: 'السحاحة ومعايرة pH', labelEn: 'Burette & pH', icon: '🎯' },
+              { id: 'pneumatic_gas', labelAr: 'حوض إزاحة الغاز', labelEn: 'Gas Trough', icon: '🌊' },
+              { id: 'digital_scale', labelAr: 'الميزان الرقمي 0.01g', labelEn: 'Analytical Balance', icon: '⚖️' },
+              { id: 'cylinder_pipette', labelAr: 'المخبار والماصة', labelEn: 'Cylinder & Pipette', icon: '💧' },
+              { id: 'test_tube_rack', labelAr: 'حامل الأنابيب (4)', labelEn: 'Test Tube Rack', icon: '🧪' },
+              { id: 'spectrometer_discharge', labelAr: 'مطياف الانبعاث والتفريغ', labelEn: 'Spectrometer & Discharge', icon: '🌈' }
+            ].map((appItem) => {
+              const isSelected = activeApparatusStation === appItem.id;
+              return (
+                <button
+                  key={appItem.id}
+                  type="button"
+                  onClick={() => setActiveApparatusStation(appItem.id as ApparatusStationType)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 border ${
+                    isSelected
+                      ? 'bg-cyan-600 border-cyan-400 text-white shadow-xs'
+                      : isDark
+                      ? 'bg-slate-900 border-slate-800/90 text-slate-300 hover:bg-slate-800 hover:text-white'
+                      : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{appItem.icon}</span>
+                  <span>{t(appItem.labelAr, appItem.labelEn)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </header>
   );
 };

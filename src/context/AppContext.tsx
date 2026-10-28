@@ -3,7 +3,20 @@ import { setGlobalSoundEnabled, playLabSound } from '../utils/soundEffects';
 
 export type AppLanguage = 'ar' | 'en';
 export type AppTheme = 'dark' | 'light';
-export type ActiveTabType = 'atom-builder' | 'states-of-matter' | 'radioactive-decay' | 'experiments-lab';
+export type ActiveTabType =
+  | 'atom-builder'
+  | 'molecule-builder'
+  | 'states-of-matter'
+  | 'radioactive-decay'
+  | 'experiments-lab';
+export type ApparatusStationType =
+  | 'main_workbench'
+  | 'burette_titration'
+  | 'pneumatic_gas'
+  | 'digital_scale'
+  | 'cylinder_pipette'
+  | 'test_tube_rack'
+  | 'spectrometer_discharge';
 
 export interface LabExperimentTrigger {
   substanceId?: string;
@@ -31,6 +44,8 @@ interface AppContextType {
   t: (ar: string, en: string) => string;
   activeTab: ActiveTabType;
   setActiveTab: (tab: ActiveTabType) => void;
+  activeApparatusStation: ApparatusStationType;
+  setActiveApparatusStation: (station: ApparatusStationType) => void;
   activeLabPreset: LabExperimentTrigger | null;
   launchLabExperiment: (tab: ActiveTabType, config: LabExperimentTrigger) => void;
   clearLabExperiment: () => void;
@@ -53,7 +68,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [activeTab, setActiveTabState] = useState<ActiveTabType>('atom-builder');
+  const [activeApparatusStation, setActiveApparatusStationState] = useState<ApparatusStationType>('main_workbench');
   const [activeLabPreset, setActiveLabPreset] = useState<LabExperimentTrigger | null>(null);
+
+  const setActiveApparatusStation = (station: ApparatusStationType) => {
+    setActiveApparatusStationState(station);
+    playLabSound('click');
+  };
 
   useEffect(() => {
     setGlobalSoundEnabled(soundEnabled);
@@ -145,6 +166,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         t,
         activeTab,
         setActiveTab,
+        activeApparatusStation,
+        setActiveApparatusStation,
         activeLabPreset,
         launchLabExperiment,
         clearLabExperiment

@@ -286,23 +286,51 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
       const shellNames = ['K (n=1)', 'L (n=2)', 'M (n=3)', 'N (n=4)', 'O (n=5)', 'P (n=6)', 'Q (n=7)'];
       const shellDirs = [1, -1, 1, -1, 1, -1, 1];
 
-      // Draw Orbit Rings
+      // Ambient Quantum Probability Aura
+      const outerRadius = shellRadii[activeShellCount - 1] || 120;
+      const quantumAura = ctx.createRadialGradient(cx, cy, 5, cx, cy, outerRadius * 1.05);
+      quantumAura.addColorStop(0, isStable ? 'rgba(56, 189, 248, 0.08)' : 'rgba(239, 68, 68, 0.10)');
+      quantumAura.addColorStop(0.5, isStable ? 'rgba(6, 182, 212, 0.03)' : 'rgba(249, 115, 22, 0.04)');
+      quantumAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = quantumAura;
+      ctx.beginPath();
+      ctx.arc(cx, cy, outerRadius * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw Orbit Rings with Neon Glow
       for (let i = 0; i < 7; i++) {
         if (shells[i] > 0 || (i === 0 && electrons === 0)) {
           const r = shellRadii[i];
+
+          // Outer soft luminescence
           ctx.beginPath();
           ctx.arc(cx, cy, r, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.16)';
-          ctx.lineWidth = 1.2;
-          ctx.setLineDash([5, 5]);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.07)';
+          ctx.lineWidth = 3.5;
+          ctx.stroke();
+
+          // Main crisp orbit path
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
+          ctx.lineWidth = 1.3;
+          ctx.setLineDash([6, 5]);
           ctx.stroke();
           ctx.setLineDash([]);
 
-          // Shell label
-          ctx.fillStyle = 'rgba(148, 163, 184, 0.4)';
+          // Shell label with background pill
+          const labelText = shellNames[i];
           ctx.font = 'bold 9px Cairo, sans-serif';
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+          const textW = ctx.measureText(labelText).width;
+          ctx.fillRect(cx + r - textW - 12, cy - 13, textW + 8, 12);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+          ctx.lineWidth = 0.8;
+          ctx.strokeRect(cx + r - textW - 12, cy - 13, textW + 8, 12);
+
+          ctx.fillStyle = isDark ? '#38bdf8' : '#0284c7';
           ctx.textAlign = 'right';
-          ctx.fillText(shellNames[i], cx + r - 8, cy - 4);
+          ctx.fillText(labelText, cx + r - 8, cy - 4);
         }
       }
 
@@ -341,8 +369,8 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
 
         // Jitter if radioactive
         if (!isStable && protons > 0) {
-          n1.vx += (Math.random() - 0.5) * 0.25;
-          n1.vy += (Math.random() - 0.5) * 0.25;
+          n1.vx += (Math.random() - 0.5) * 0.28;
+          n1.vy += (Math.random() - 0.5) * 0.28;
         }
 
         // Velocity damping
@@ -353,27 +381,58 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         n1.y += n1.vy;
       }
 
-      // Draw Nucleus Nodes
+      // Draw Strong-Force Gluon Exchange Energy Bonds Between Contacting Nucleons
+      if (nodes.length > 1) {
+        ctx.save();
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const dx = nodes[j].x - nodes[i].x;
+            const dy = nodes[j].y - nodes[i].y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            const contactThresh = (nodes[i].radius + nodes[j].radius) * 1.25;
+            if (d < contactThresh) {
+              const alpha = Math.max(0, 1 - d / contactThresh) * 0.45;
+              ctx.strokeStyle = `rgba(251, 191, 36, ${alpha.toFixed(2)})`;
+              ctx.lineWidth = 1.5;
+              ctx.beginPath();
+              ctx.moveTo(nodes[i].x, nodes[i].y);
+              ctx.lineTo(nodes[j].x, nodes[j].y);
+              ctx.stroke();
+            }
+          }
+        }
+        ctx.restore();
+      }
+
+      // Draw Nucleus Nodes with Hyper-Realistic 3D Sphere Gradients & Specular Highlights
       nodes.forEach(node => {
+        const r = node.radius;
         const grad = ctx.createRadialGradient(
-          node.x - 2, node.y - 2, 1,
-          node.x, node.y, node.radius
+          node.x - r * 0.35, node.y - r * 0.35, r * 0.1,
+          node.x, node.y, r
         );
 
         if (node.type === 'proton') {
-          grad.addColorStop(0, '#fca5a5');
-          grad.addColorStop(0.35, '#ef4444');
-          grad.addColorStop(1, '#991b1b');
+          grad.addColorStop(0, '#fecaca');
+          grad.addColorStop(0.2, '#f87171');
+          grad.addColorStop(0.65, '#dc2626');
+          grad.addColorStop(1, '#7f1d1d');
 
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+          ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
           ctx.fillStyle = grad;
-          ctx.shadowColor = 'rgba(239, 68, 68, 0.4)';
-          ctx.shadowBlur = 4;
+          ctx.shadowColor = 'rgba(239, 68, 68, 0.6)';
+          ctx.shadowBlur = 6;
           ctx.fill();
           ctx.shadowBlur = 0;
 
-          if (node.radius >= 6) {
+          // 3D Specular highlight dot (glass / sphere shine)
+          ctx.beginPath();
+          ctx.arc(node.x - r * 0.35, node.y - r * 0.35, Math.max(1, r * 0.22), 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+          ctx.fill();
+
+          if (r >= 6) {
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 8px Arial';
             ctx.textAlign = 'center';
@@ -381,21 +440,28 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             ctx.fillText('+', node.x, node.y - 0.5);
           }
         } else {
-          grad.addColorStop(0, '#f1f5f9');
-          grad.addColorStop(0.35, '#94a3b8');
-          grad.addColorStop(1, '#475569');
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.2, '#cbd5e1');
+          grad.addColorStop(0.65, '#64748b');
+          grad.addColorStop(1, '#334155');
 
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+          ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
           ctx.fillStyle = grad;
-          ctx.shadowColor = 'rgba(148, 163, 184, 0.2)';
-          ctx.shadowBlur = 3;
+          ctx.shadowColor = 'rgba(148, 163, 184, 0.4)';
+          ctx.shadowBlur = 4;
           ctx.fill();
           ctx.shadowBlur = 0;
+
+          // 3D Specular highlight dot
+          ctx.beginPath();
+          ctx.arc(node.x - r * 0.35, node.y - r * 0.35, Math.max(1, r * 0.22), 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.fill();
         }
       });
 
-      // Update Orbital Angles & Draw Orbiting Electrons (Pauli Principle: Alternating Directions & Spins)
+      // Update Orbital Angles & Draw Orbiting Electrons with Comet Trails
       for (let i = 0; i < 7; i++) {
         if (shells[i] > 0) {
           const speed = (0.035 / (i + 1)) * orbitSpeed;
@@ -405,15 +471,7 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
           const r = shellRadii[i];
 
           for (let e = 0; e < numE; e++) {
-            // Pauli Exclusion Principle: Paired electrons in an orbital have opposite spins and directions!
-            // Even electrons (0, 2, 4...) are Spin-Up (↑, Cyan), orbiting Counter-Clockwise (عكس عقارب الساعة)
-            // Odd electrons (1, 3, 5...) are Spin-Down (↓, Orange), orbiting Clockwise (مع عقارب الساعة)
             const isSpinUp = (e % 2 === 0);
-
-            // Counter-rotating directional phase:
-            // In Canvas (+y down):
-            // - Decreasing theta = Counter-Clockwise (Spin Up ↑)
-            // - Increasing theta = Clockwise (Spin Down ↓)
             const baseTheta = e * ((Math.PI * 2) / numE);
             const theta = isSpinUp
               ? baseTheta - shellAnglesRef.current[i]
@@ -422,14 +480,24 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
             const ex = cx + Math.cos(theta) * r;
             const ey = cy + Math.sin(theta) * r;
 
+            // Radiant Comet Trail behind each electron
+            const trailSpan = 0.35; // radians behind
+            const trailStart = theta;
+            const trailEnd = isSpinUp ? theta + trailSpan : theta - trailSpan;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, trailStart, trailEnd, !isSpinUp);
+            ctx.strokeStyle = isSpinUp ? 'rgba(56, 189, 248, 0.4)' : 'rgba(251, 146, 60, 0.4)';
+            ctx.lineWidth = 2.2;
+            ctx.stroke();
+
             const electronGrad = ctx.createRadialGradient(ex - 1.5, ey - 1.5, 0.5, ex, ey, 4.5);
             if (isSpinUp) {
-              electronGrad.addColorStop(0, '#bae6fd');
-              electronGrad.addColorStop(0.4, '#38bdf8');
+              electronGrad.addColorStop(0, '#ffffff');
+              electronGrad.addColorStop(0.35, '#38bdf8');
               electronGrad.addColorStop(1, '#0284c7');
             } else {
-              electronGrad.addColorStop(0, '#fed7aa');
-              electronGrad.addColorStop(0.4, '#fb923c');
+              electronGrad.addColorStop(0, '#ffffff');
+              electronGrad.addColorStop(0.35, '#fb923c');
               electronGrad.addColorStop(1, '#ea580c');
             }
 
@@ -644,13 +712,20 @@ export const AtomBuilder: React.FC<AtomBuilderProps> = ({ onOpenGuide }) => {
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs font-bold no-scrollbar flex-1">
           {[
             { label: t('¹H الهيدروجين', '¹H Hydrogen'), p: 1, n: 0, e: 1 },
+            { label: t('²H ديوتيريوم (ماء ثقيل)', '²H Deuterium'), p: 1, n: 1, e: 1 },
+            { label: t('³H تريتيوم مشع', '³H Tritium'), p: 1, n: 2, e: 1 },
             { label: t('⁴He الهيليوم (سحري)', '⁴He Helium (Magic)'), p: 2, n: 2, e: 2 },
             { label: t('¹²C الكربون الأساسي', '¹²C Carbon-12'), p: 6, n: 6, e: 6 },
             { label: t('¹⁴C الكربون المشع', '¹⁴C Carbon-14'), p: 6, n: 8, e: 6 },
+            { label: t('¹⁶O الأكسجين', '¹⁶O Oxygen-16'), p: 8, n: 8, e: 8 },
             { label: t('²³Na⁺ أيون الصوديوم', '²³Na⁺ Sodium Ion'), p: 11, n: 12, e: 10 },
+            { label: t('²⁸Si السيليكون', '²⁸Si Silicon-28'), p: 14, n: 14, e: 14 },
+            { label: t('⁴⁰Ca كالسيوم سحري مزدوج', '⁴⁰Ca Doubly Magic'), p: 20, n: 20, e: 20 },
             { label: t('⁵⁶Fe الحديد المستقر', '⁵⁶Fe Iron-56'), p: 26, n: 30, e: 26 },
+            { label: t('¹⁰⁷Ag الفضة', '¹⁰⁷Ag Silver-107'), p: 47, n: 60, e: 47 },
             { label: t('¹⁹⁷Au الذهب النبيل', '¹⁹⁷Au Noble Gold'), p: 79, n: 118, e: 79 },
             { label: t('²⁰⁸Pb رصاص سحري مزدوج', '²⁰⁸Pb Doubly Magic'), p: 82, n: 126, e: 82 },
+            { label: t('²³⁵U يورانيوم انشطاري', '²³⁵U Fissile Uranium'), p: 92, n: 143, e: 92 },
             { label: t('²³⁸U اليورانيوم المشع', '²³⁸U Uranium-238'), p: 92, n: 146, e: 92 },
           ].map((preset, idx) => {
             const isCurrent = protons === preset.p && neutrons === preset.n && electrons === preset.e;

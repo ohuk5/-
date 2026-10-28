@@ -29,7 +29,8 @@ import {
   MatterPhase,
   SubstanceInfo,
   calculateEffectiveBoilingPoint,
-  calculateEffectiveMeltingPoint
+  calculateEffectiveMeltingPoint,
+  calculatePlasmaThreshold
 } from '../data/substancesData';
 import { useApp } from '../context/AppContext';
 import { StatesOfMatter3D } from './StatesOfMatter3D';
@@ -65,6 +66,8 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
   const [burnerActive, setBurnerActive] = useState<'heat' | 'cool' | null>(null);
   const [isVenting, setIsVenting] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'3d' | '2d'>('2d'); // 2D default mode
+  const [plasmaModeRequested, setPlasmaModeRequested] = useState<boolean>(false);
+  const [magneticDeflectorActive, setMagneticDeflectorActive] = useState<boolean>(false);
 
   // Exact Temperature Input State (as requested by user)
   const [tempUnit, setTempUnit] = useState<'K' | 'C'>('K');
@@ -89,24 +92,43 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
   const substance: SubstanceInfo = SUBSTANCES[substanceId] || SUBSTANCES['water'];
   const phaseInfo = calculatePhase(actualTemp, substance, pressureAtm, lang);
 
-  // Dynamic Scale bounds for the temperature bar tailored accurately to each substance
-  const maxScaleK =
-    substance.boilingPointK < 40
-      ? 120
-      : substance.boilingPointK < 150
-      ? 300
-      : substance.boilingPointK <= 450
-      ? 600
-      : substance.boilingPointK <= 900
-      ? 1000
-      : Math.ceil((substance.boilingPointK * 1.3) / 100) * 100;
+  const plasmaThresholdK = calculatePlasmaThreshold(substance);
+  const isPlasmaZone = plasmaModeRequested || actualTemp >= plasmaThresholdK * 0.95;
+
+  // Dynamic Scale bounds for the temperature bar tailored accurately to each substance (with Plasma support!)
+  const maxScaleK = isPlasmaZone
+    ? Math.max(9000, Math.ceil((plasmaThresholdK * 1.5) / 500) * 500)
+    : substance.boilingPointK < 40
+    ? 120
+    : substance.boilingPointK < 150
+    ? 300
+    : substance.boilingPointK <= 450
+    ? 600
+    : substance.boilingPointK <= 900
+    ? 1000
+    : Math.ceil((substance.boilingPointK * 1.3) / 100) * 100;
 
   const isSublimatingNow = Boolean(substance.isSublimating && pressureAtm < 5.1);
 
-  // Piecewise-exact needle percentage so the needle ALWAYS matches the Solid / Liquid / Gas zones & Tm / Tb borders 100%
+  // Piecewise-exact needle percentage so the needle ALWAYS matches the Solid / Liquid / Gas / Plasma zones
   const phaseRulerNeedlePct = (() => {
     const tm = Math.max(0.5, phaseInfo.effectiveTm);
     const tb = Math.max(tm + 0.5, phaseInfo.effectiveTb);
+
+    if (isPlasmaZone) {
+      // 4-phase mapping: Solid (0-25%), Liquid (25-50%), Gas (50-75%), Plasma (75-100%)
+      if (actualTemp <= tm) {
+        return Math.max(1, Math.min(25, (actualTemp / tm) * 25));
+      }
+      if (actualTemp <= tb) {
+        return Math.max(25, Math.min(50, 25 + ((actualTemp - tm) / Math.max(0.1, tb - tm)) * 25));
+      }
+      if (actualTemp <= plasmaThresholdK) {
+        return Math.max(50, Math.min(75, 50 + ((actualTemp - tb) / Math.max(1, plasmaThresholdK - tb)) * 25));
+      }
+      return Math.max(75, Math.min(99, 75 + ((actualTemp - plasmaThresholdK) / Math.max(1, maxScaleK - plasmaThresholdK)) * 25));
+    }
+
     if (isSublimatingNow) {
       if (actualTemp <= tm) {
         return Math.max(1, Math.min(50, (actualTemp / tm) * 50));
@@ -736,6 +758,16 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         } else if (currentP === 'boiling') {
           p.vy += gEffect * 0.35;
           p.vy -= 0.12;
+        } else if (currentP === 'plasma') {
+          // PLASMA: Extreme thermal kinetic energy & Electromagnetic Lorentz Force F = q(v x B)
+          if (magneticDeflectorActive) {
+            // Lorentz force on positive ion: F_y = q * v_x * B
+            p.vy += p.vx * 0.18;
+            p.vx -= p.vy * 0.09;
+          }
+          // Hyperactive thermal agitation
+          p.vx += (Math.random() - 0.5) * 0.42;
+          p.vy += (Math.random() - 0.5) * 0.42;
         } else {
           if (gravityValue > 0) {
             p.vy += gEffect * 0.04;
@@ -748,7 +780,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
 
         // Wall collisions
         const r = p.radius;
-        const bounce = currentP === 'gas' ? 0.98 : 0.55;
+        const bounce = (currentP === 'gas' || currentP === 'plasma') ? 0.98 : 0.55;
 
         if (p.x < leftWall + r) {
           p.x = leftWall + r;
@@ -834,11 +866,61 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         ctx.restore();
       }
 
+      // Draw 2D Plasma Electric Discharge Lightning Arcs
+      if (currentP === 'plasma') {
+        ctx.save();
+        ctx.strokeStyle = '#c084fc';
+        ctx.lineWidth = 1.6;
+        for (let i = 0; i < n; i++) {
+          for (let j = i + 1; j < n; j++) {
+            const dx = particles[j].x - particles[i].x;
+            const dy = particles[j].y - particles[i].y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < 55 && Math.random() < 0.28) {
+              const midX = (particles[i].x + particles[j].x) / 2 + (Math.random() - 0.5) * 10;
+              const midY = (particles[i].y + particles[j].y) / 2 + (Math.random() - 0.5) * 10;
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(midX, midY);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.stroke();
+            }
+          }
+        }
+        ctx.restore();
+      }
+
       // RENDER MOLECULES & ATOMS (Supporting all 12 substances including Gold and Bromine!)
       particles.forEach(p => {
         const rx = p.x;
         const ry = p.y;
         const theta = p.angle;
+
+        // Plasma Ionization Visualizer: Glowing Corona & Detached Orbiting Free Electrons
+        if (currentP === 'plasma') {
+          // Ion aura
+          const auraGrad = ctx.createRadialGradient(rx, ry, p.radius * 0.4, rx, ry, p.radius * 2.4);
+          auraGrad.addColorStop(0, 'rgba(192, 132, 252, 0.7)');
+          auraGrad.addColorStop(0.5, 'rgba(6, 182, 212, 0.35)');
+          auraGrad.addColorStop(1, 'transparent');
+          ctx.beginPath();
+          ctx.arc(rx, ry, p.radius * 2.4, 0, Math.PI * 2);
+          ctx.fillStyle = auraGrad;
+          ctx.fill();
+
+          // Detached buzzing electron (opposite deflection if magnetic field is active)
+          const eAngle = Date.now() * 0.018 + p.x * 0.5;
+          const eDist = p.radius + 11 + Math.sin(Date.now() * 0.02 + p.y) * 3;
+          let ex = rx + Math.cos(eAngle) * eDist;
+          let ey = ry + Math.sin(eAngle) * eDist;
+          if (magneticDeflectorActive) {
+            ey -= 8; // opposite magnetic drift
+          }
+          ctx.beginPath();
+          ctx.arc(ex, ey, 2.2, 0, Math.PI * 2);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fill();
+        }
 
         if (substance.particleType === 'water') {
           const hOffset = 6.5;
@@ -924,8 +1006,37 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
           ctx.arc(rx, ry, 5, 0, Math.PI * 2);
           ctx.fillStyle = '#0d9488';
           ctx.fill();
+        } else if (substance.particleType === 'ammonia') {
+          // Ammonia (NH3): Nitrogen central atom + 3 Hydrogens at 120°
+          const hDist = 6.2;
+          for (let k = 0; k < 3; k++) {
+            const hAng = theta + (k * (Math.PI * 2)) / 3;
+            const hx = rx + Math.cos(hAng) * hDist;
+            const hy = ry + Math.sin(hAng) * hDist;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.6;
+            ctx.moveTo(rx, ry);
+            ctx.lineTo(hx, hy);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(hx, hy, 2.8, 0, Math.PI * 2);
+            ctx.fillStyle = '#f8fafc';
+            ctx.fill();
+          }
+
+          const nGrad = ctx.createRadialGradient(rx - 2, ry - 2, 1, rx, ry, 5.2);
+          nGrad.addColorStop(0, '#7dd3fc');
+          nGrad.addColorStop(0.4, '#0284c7');
+          nGrad.addColorStop(1, '#0c4a6e');
+          ctx.beginPath();
+          ctx.arc(rx, ry, 5.2, 0, Math.PI * 2);
+          ctx.fillStyle = nGrad;
+          ctx.fill();
         } else if (substance.particleType === 'diatomic') {
-          // O2, N2, or Bromine (Br2)
+          // O2, N2, Br2, Cl2, I2, or H2
           const offsetDist = 5.5;
           const subX1 = rx + Math.cos(theta) * offsetDist;
           const subY1 = ry + Math.sin(theta) * offsetDist;
@@ -948,37 +1059,64 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
             ctx.arc(pos.x, pos.y, 5.5, 0, Math.PI * 2);
             ctx.fillStyle = grad;
             ctx.fill();
+
+            // Specular glint
+            ctx.beginPath();
+            ctx.arc(pos.x - 1.5, pos.y - 1.5, 1.2, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fill();
           });
         } else if (substance.particleType === 'metallic') {
-          // Mercury, Iron, or Gold (Au)
+          // Mercury, Iron, Gold, Silver, Lead, Sodium, Aluminum, Tungsten, Titanium
           const grad = ctx.createRadialGradient(rx - 3, ry - 3, 1, rx, ry, p.radius);
           grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.35, substance.color);
-          grad.addColorStop(0.8, '#475569');
+          grad.addColorStop(0.32, substance.color);
+          grad.addColorStop(0.75, '#475569');
           grad.addColorStop(1, '#0f172a');
 
           ctx.beginPath();
           ctx.arc(rx, ry, p.radius, 0, Math.PI * 2);
           ctx.fillStyle = grad;
           ctx.fill();
-          ctx.strokeStyle = substance.id === 'gold' ? '#fde047' : '#94a3b8';
+
+          // 3D Specular shine spot
+          ctx.beginPath();
+          ctx.arc(rx - p.radius * 0.35, ry - p.radius * 0.35, Math.max(1, p.radius * 0.22), 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+          ctx.fill();
+
+          ctx.strokeStyle = substance.id === 'gold' ? '#fde047' : substance.id === 'silver' ? '#ffffff' : '#94a3b8';
           ctx.lineWidth = 1;
           ctx.stroke();
         } else {
-          // Monatomic Noble Gas (He, Ne, Ar)
+          // Monatomic Noble Gas or Carbon
           const color = substance.color;
           const grad = ctx.createRadialGradient(rx - 2, ry - 2, 1, rx, ry, p.radius);
           grad.addColorStop(0, '#ffffff');
           grad.addColorStop(0.35, color);
-          grad.addColorStop(1, '#090d16');
+          grad.addColorStop(1, '#020617');
 
           ctx.beginPath();
           ctx.arc(rx, ry, p.radius, 0, Math.PI * 2);
           ctx.fillStyle = grad;
-          ctx.shadowColor = color;
-          ctx.shadowBlur = actualTemp > 200 ? 5 : 2;
           ctx.fill();
-          ctx.shadowBlur = 0;
+
+          // 3D Specular shine spot
+          ctx.beginPath();
+          ctx.arc(rx - p.radius * 0.35, ry - p.radius * 0.35, Math.max(1, p.radius * 0.2), 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.fill();
+        }
+
+        // Thermal Motion Blur Trails for high kinetic velocity gas molecules
+        const velSq = p.vx * p.vx + p.vy * p.vy;
+        if (velSq > 1.2 && (currentP === 'gas' || currentP === 'boiling')) {
+          const speed = Math.sqrt(velSq);
+          const trailLen = Math.min(18, speed * 2.8);
+          ctx.beginPath();
+          ctx.moveTo(rx, ry);
+          ctx.lineTo(rx - (p.vx / speed) * trailLen, ry - (p.vy / speed) * trailLen);
+          ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(0.4, speed * 0.08).toFixed(2)})`;
         }
       });
 
@@ -991,25 +1129,29 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
       isRunning = false;
       cancelAnimationFrame(animId);
     };
-  }, [substance, targetTemp, gravityValue, volumeLidPercent, phaseInfo.phase, burnerActive, isVenting, theme, viewMode]);
+  }, [substance, targetTemp, gravityValue, volumeLidPercent, phaseInfo.phase, burnerActive, isVenting, theme, viewMode, magneticDeflectorActive]);
 
   // Jump to specific state presets
-  const jumpToPhase = (phase: 'solid' | 'liquid' | 'gas') => {
+  const jumpToPhase = (phase: 'solid' | 'liquid' | 'gas' | 'plasma') => {
     let tVal: number;
     const Tm = phaseInfo.effectiveTm;
     const Tb = phaseInfo.effectiveTb;
+    const plasmaThreshold = calculatePlasmaThreshold(substance);
 
     if (phase === 'solid') {
       tVal = Math.max(5, Tm - 35);
     } else if (phase === 'liquid') {
       tVal = (Tm + Tb) / 2;
+    } else if (phase === 'gas') {
+      tVal = Math.min(plasmaThreshold - 200, Tb + 45);
     } else {
-      tVal = Math.min(maxScaleK - 20, Tb + 45);
+      setPlasmaModeRequested(true);
+      tVal = Math.round(plasmaThreshold + 400);
     }
     setTargetTemp(Math.round(tVal));
   };
 
-  // Interactive Click on the Temperature Ruler (Piecewise-aligned with Solid / Liquid / Gas zones)
+  // Interactive Click on the Temperature Ruler (Piecewise-aligned with Solid / Liquid / Gas / Plasma zones)
   const handleRulerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -1018,7 +1160,17 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
     const tb = Math.max(tm + 0.5, phaseInfo.effectiveTb);
 
     let newTemp: number;
-    if (isSublimatingNow) {
+    if (isPlasmaZone) {
+      if (ratio <= 0.25) {
+        newTemp = (ratio / 0.25) * tm;
+      } else if (ratio <= 0.5) {
+        newTemp = tm + ((ratio - 0.25) / 0.25) * (tb - tm);
+      } else if (ratio <= 0.75) {
+        newTemp = tb + ((ratio - 0.5) / 0.25) * (plasmaThresholdK - tb);
+      } else {
+        newTemp = plasmaThresholdK + ((ratio - 0.75) / 0.25) * (maxScaleK - plasmaThresholdK);
+      }
+    } else if (isSublimatingNow) {
       if (ratio <= 0.5) {
         newTemp = (ratio / 0.5) * tm;
       } else {
@@ -1036,7 +1188,18 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
     setTargetTemp(Math.max(2, Math.min(maxScaleK, Math.round(newTemp))));
   };
 
-  const runExperiment = (exp: 'space_drop' | 'pressure_cooker' | 'co2_sublime' | 'mercury_liquid' | 'gold_melt' | 'bromine_vapor') => {
+  const runExperiment = (
+    exp:
+      | 'space_drop'
+      | 'pressure_cooker'
+      | 'co2_sublime'
+      | 'mercury_liquid'
+      | 'gold_melt'
+      | 'bromine_vapor'
+      | 'iodine_sublime'
+      | 'liquid_hydrogen'
+      | 'plasma_arc'
+  ) => {
     if (exp === 'space_drop') {
       setSubstanceId('water');
       setTargetTemp(295);
@@ -1118,6 +1281,52 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
         description: t(
           'يغلي سائل البروم الأحمر الداكن عند 58.8 °C (332 K) فقط ليتطاير كبخار هالوجيني كثيف.',
           'Dark red bromine liquid boils at only 58.8 °C (332 K) into a dense halogen vapor.'
+        ),
+        type: 'boiling'
+      });
+    } else if (exp === 'iodine_sublime') {
+      setSubstanceId('iodine');
+      setTargetTemp(395);
+      setActualTemp(395);
+      setVolumeLidPercent(80);
+      handleSetGravityPreset('earth');
+      setTransitionNotification({
+        title: t('🟣 تجربة تسامي اليود البنفسجي', '🟣 Purple Iodine Sublimation'),
+        description: t(
+          'تتحول بلورات اليود الداكنة مباشرة إلى سحب من البخار البنفسجي الساحر عند التسخين دون المرور بالحالة السائلة!',
+          'Dark iodine crystals sublimate directly into clouds of magnificent purple vapor without a liquid phase!'
+        ),
+        type: 'sublimation'
+      });
+    } else if (exp === 'liquid_hydrogen') {
+      setSubstanceId('hydrogen');
+      setTargetTemp(17);
+      setActualTemp(17);
+      setVolumeLidPercent(70);
+      handleSetGravityPreset('earth');
+      setTransitionNotification({
+        title: t('🚀 تجربة الهيدروجين فائق البرودة (17 K)', '🚀 Cryogenic Liquid Hydrogen (17 K)'),
+        description: t(
+          'أخف سائل كوني على الإطلاق؛ وقود صواريخ الفضاء عند درجات حرارة قريبة من الصفر المطلق (-253 °C).',
+          'The lightest cryogenic liquid in the universe, powering deep-space rocket propulsion at -253 °C.'
+        ),
+        type: 'boiling'
+      });
+    } else if (exp === 'plasma_arc') {
+      setSubstanceId('argon');
+      setPlasmaModeRequested(true);
+      const thresh = calculatePlasmaThreshold(SUBSTANCES['argon']);
+      const targetT = thresh + 650;
+      setTargetTemp(targetT);
+      setActualTemp(targetT);
+      setVolumeLidPercent(75);
+      handleSetGravityPreset('earth');
+      playLabSound('spark');
+      setTransitionNotification({
+        title: t('⚡ تجربة البلازما الفائقة والتأين الكهرومغناطيسي', '⚡ Super Plasma & Ionization Experiment'),
+        description: t(
+          'شاهد كيف تتحول الذرات عند درجات الحرارة الفائقة إلى أيونات موجبة وإلكترونات حرة طليقة، مع صواعق تفريغ متوهجة وتأثر مباشر بالمجال المغناطيسي!',
+          'Observe how extreme thermal energy strips valence electrons into positive ions and hyperactive free electrons with glowing lightning arcs!'
         ),
         type: 'boiling'
       });
@@ -1217,6 +1426,30 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
           >
             <span>🧪</span>
             <span>{t('الزئبق السائل', 'Liquid Mercury')}</span>
+          </button>
+
+          <button
+            onClick={() => runExperiment('iodine_sublime')}
+            className="px-3 py-1.5 rounded-xl bg-purple-950/70 hover:bg-purple-900/80 border border-purple-600/50 text-purple-200 transition-all whitespace-nowrap flex items-center gap-1"
+          >
+            <span>🟣</span>
+            <span>{t('تسامي اليود البنفسجي', 'Iodine Sublimation')}</span>
+          </button>
+
+          <button
+            onClick={() => runExperiment('liquid_hydrogen')}
+            className="px-3 py-1.5 rounded-xl bg-blue-950/70 hover:bg-blue-900/80 border border-blue-600/50 text-blue-200 transition-all whitespace-nowrap flex items-center gap-1"
+          >
+            <span>❄️</span>
+            <span>{t('الهيدروجين فائق البرودة', 'Cryogenic H₂ (17 K)')}</span>
+          </button>
+
+          <button
+            onClick={() => runExperiment('plasma_arc')}
+            className="px-3 py-1.5 rounded-xl bg-purple-950/80 hover:bg-purple-900/90 border border-purple-500/60 text-purple-200 transition-all whitespace-nowrap flex items-center gap-1"
+          >
+            <span>⚡</span>
+            <span>{t('توليد البلازما الفائقة', 'Super Plasma Arc')}</span>
           </button>
         </div>
 
@@ -1489,6 +1722,25 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
                     <Wind className="w-3 h-3 text-cyan-400" />
                     <span>{t('تفريغ', 'Vent')}</span>
                   </button>
+
+                  {phaseInfo.phase === 'plasma' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playLabSound('spark');
+                        setMagneticDeflectorActive(!magneticDeflectorActive);
+                      }}
+                      title={t('تفعيل الحصر المغناطيسي وانحراف لورنتز', 'Toggle Magnetic Confinement & Lorentz Force')}
+                      className={`px-2 py-0.5 rounded border text-[11px] font-bold flex items-center gap-1 transition-all ${
+                        magneticDeflectorActive
+                          ? 'bg-purple-600 border-purple-400 text-white shadow-md animate-pulse'
+                          : 'bg-slate-900 border-slate-700 text-purple-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <span>🧲</span>
+                      <span>{magneticDeflectorActive ? t('مغناطيس نشط', 'Magnet ON') : t('مغناطيس', 'Magnet')}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1626,7 +1878,7 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
             </div>
 
             {/* Quick State Presets */}
-            <div className="w-full grid grid-cols-3 gap-2 mt-4">
+            <div className="w-full grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
               <button
                 onClick={() => jumpToPhase('solid')}
                 className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
@@ -1657,10 +1909,20 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
               >
                 {t('💨 غاز (حر التمدد)', '💨 Gas (Vapor)')}
               </button>
+              <button
+                onClick={() => jumpToPhase('plasma')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all ${
+                  phaseInfo.phase === 'plasma'
+                    ? 'bg-purple-950/90 border-purple-400 text-purple-200 shadow-lg ring-1 ring-purple-400'
+                    : isDark ? 'bg-slate-950/40 border-slate-800 text-slate-400 hover:text-purple-300' : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-purple-700'
+                }`}
+              >
+                {t('⚡ بلازما (تأين)', '⚡ Plasma (Ionized)')}
+              </button>
             </div>
           </div>
 
-          {/* TEMPERATURE PHASE DIAGRAM RULER (100% PIECEWISE-ALIGNED WITH SOLID / LIQUID / GAS!) */}
+          {/* TEMPERATURE PHASE DIAGRAM RULER (100% PIECEWISE-ALIGNED WITH SOLID / LIQUID / GAS / PLASMA!) */}
           <div className={`w-full p-4 rounded-2xl border shadow-lg space-y-2.5 ${
             isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
@@ -1674,13 +1936,57 @@ export const StatesOfMatter: React.FC<StatesOfMatterProps> = ({ onOpenGuide }) =
               </span>
             </div>
 
-            {/* Visual Ruler Bar: Piecewise-mapped so Solid (0..Tm), Liquid (Tm..Tb), Gas (Tb..Max) match the needle 100% */}
+            {/* Visual Ruler Bar: Piecewise-mapped so Solid, Liquid, Gas, and Plasma match the needle 100% */}
             <div
               dir="ltr"
               onClick={handleRulerClick}
               className="relative h-9 bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center text-[11px] font-bold text-center cursor-pointer select-none shadow-inner"
             >
-              {isSublimatingNow ? (
+              {isPlasmaZone ? (
+                <>
+                  {/* 4-Zone Ruler with Plasma */}
+                  <div
+                    style={{ width: '25%' }}
+                    className={`h-full flex items-center justify-center border-r-2 border-cyan-400/70 truncate px-1 transition-all ${
+                      phaseInfo.phase === 'solid'
+                        ? 'bg-blue-900/85 text-white font-extrabold'
+                        : 'bg-blue-950/60 text-blue-300'
+                    }`}
+                  >
+                    <span>{t('صلب 🧊', 'Solid 🧊')}</span>
+                  </div>
+                  <div
+                    style={{ width: '25%' }}
+                    className={`h-full flex items-center justify-center border-r-2 border-orange-400/70 truncate px-1 transition-all ${
+                      phaseInfo.phase === 'liquid' || phaseInfo.phase === 'melting'
+                        ? 'bg-cyan-900/85 text-white font-extrabold'
+                        : 'bg-cyan-950/60 text-cyan-200'
+                    }`}
+                  >
+                    <span>{t('سائل 💧', 'Liquid 💧')}</span>
+                  </div>
+                  <div
+                    style={{ width: '25%' }}
+                    className={`h-full flex items-center justify-center border-r-2 border-purple-400/70 truncate px-1 transition-all ${
+                      phaseInfo.phase === 'gas' || phaseInfo.phase === 'boiling'
+                        ? 'bg-orange-900/85 text-white font-extrabold'
+                        : 'bg-orange-950/60 text-orange-300'
+                    }`}
+                  >
+                    <span>{t('غاز 💨', 'Gas 💨')}</span>
+                  </div>
+                  <div
+                    style={{ width: '25%' }}
+                    className={`h-full flex items-center justify-center truncate px-1 transition-all ${
+                      phaseInfo.phase === 'plasma'
+                        ? 'bg-purple-900/90 text-white font-extrabold'
+                        : 'bg-purple-950/60 text-purple-300'
+                    }`}
+                  >
+                    <span>{t('بلازما ⚡', 'Plasma ⚡')}</span>
+                  </div>
+                </>
+              ) : isSublimatingNow ? (
                 <>
                   {/* Sublimating Solid Zone (0 K to T_sub): 50% width */}
                   <div

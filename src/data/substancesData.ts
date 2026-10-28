@@ -5,7 +5,7 @@ export interface SubstanceInfo {
   formula: string;
   meltingPointK: number; // T_m in Kelvin
   boilingPointK: number; // T_b in Kelvin
-  particleType: 'monatomic' | 'diatomic' | 'water' | 'co2' | 'methane' | 'metallic';
+  particleType: 'monatomic' | 'diatomic' | 'water' | 'co2' | 'methane' | 'metallic' | 'ammonia';
   color: string;
   themeColor: string;
   desc: string;
@@ -273,10 +273,164 @@ export const SUBSTANCES: Record<string, SubstanceInfo> = {
     descEn: 'Aerospace super-metal combining high tensile strength, low density, and extreme corrosion resistance; melts at 1941 K and boils at 3560 K.',
     defaultTempK: 300,
     mass: 47.867
+  },
+  lead: {
+    id: 'lead',
+    name: 'الرصاص',
+    nameEn: 'Lead',
+    formula: 'Pb',
+    meltingPointK: 600.61, // 327.46 °C
+    boilingPointK: 2022, // 1749 °C
+    particleType: 'metallic',
+    color: '#94a3b8',
+    themeColor: 'slate',
+    desc: 'فلز ثقيل فائق الكثافة، يمتلك قدرة فائقة على حجب الأشعة السينية والإشعاعات النووية، ينصهر عند 327.5 °C ويسهل صبه وتشكيله.',
+    descEn: 'Heavy, dense metal with extraordinary radiation shielding capability against X-rays and gamma rays, melting at 327.5 °C.',
+    defaultTempK: 300,
+    mass: 207.2
+  },
+  silver: {
+    id: 'silver',
+    name: 'الفضة',
+    nameEn: 'Silver',
+    formula: 'Ag',
+    meltingPointK: 1234.93, // 961.78 °C
+    boilingPointK: 2435, // 2162 °C
+    particleType: 'metallic',
+    color: '#e2e8f0',
+    themeColor: 'slate',
+    desc: 'أعلى العناصر توصيلاً للكهرباء والحرارة وأعلاها انعكاساً للضوء المرئي بنسبة 99%، ينصهر إلى سائل لامع كالمرايا عند 961.8 °C.',
+    descEn: 'The element with the highest electrical and thermal conductivity and highest optical reflectivity (99%), melting into a mirror-like fluid at 961.8 °C.',
+    defaultTempK: 300,
+    mass: 107.868
+  },
+  chlorine: {
+    id: 'chlorine',
+    name: 'الكلور',
+    nameEn: 'Chlorine',
+    formula: 'Cl₂',
+    meltingPointK: 171.6, // -101.55 °C
+    boilingPointK: 239.11, // -34.04 °C
+    particleType: 'diatomic',
+    color: '#a3e635',
+    themeColor: 'lime',
+    desc: 'غاز هالوجيني ثنائي الذرة أصفر-مخضر سام وذو رائحة نفاذة، يغلي عند -34 °C، وهو عامل مؤكسد ومعقم عالمي للمياه.',
+    descEn: 'Toxic, pungent greenish-yellow diatomic halogen gas boiling at -34 °C. A powerful oxidizer and global water disinfectant.',
+    defaultTempK: 250,
+    mass: 70.906
+  },
+  iodine: {
+    id: 'iodine',
+    name: 'اليود',
+    nameEn: 'Iodine',
+    formula: 'I₂',
+    meltingPointK: 386.85, // 113.7 °C
+    boilingPointK: 457.4, // 184.3 °C
+    particleType: 'diatomic',
+    color: '#c084fc',
+    themeColor: 'purple',
+    desc: 'بلورات بنفسجية داكنة لامعة تشتهر بالتسامي؛ إذ تتصاعد عند تسخينها الخفيف إلى بخار بنفسجي غامق ساحر دون أن تسيل عند الضغط الجوي.',
+    descEn: 'Lustrous dark purple crystals renowned for sublimation, releasing magnificent deep-violet vapors upon gentle heating.',
+    defaultTempK: 300,
+    mass: 253.808,
+    isSublimating: true,
+    criticalPressureAtm: 1.2
+  },
+  aluminum: {
+    id: 'aluminum',
+    name: 'الألمنيوم',
+    nameEn: 'Aluminum',
+    formula: 'Al',
+    meltingPointK: 933.47, // 660.32 °C
+    boilingPointK: 2743, // 2470 °C
+    particleType: 'metallic',
+    color: '#cbd5e1',
+    themeColor: 'slate',
+    desc: 'أكثر المعادن وفرة في القشرة الأرضية، خفيف ومتين ومحمي بطبقة أكسيد عازلة، ينصهر عند 660.3 °C ويغلي عند حرارة 2743 K.',
+    descEn: 'Most abundant metal in Earth’s crust; lightweight yet exceptionally strong with a self-passivating protective oxide film.',
+    defaultTempK: 300,
+    mass: 26.982
+  },
+  sodium: {
+    id: 'sodium',
+    name: 'الصوديوم',
+    nameEn: 'Sodium',
+    formula: 'Na',
+    meltingPointK: 370.87, // 97.72 °C
+    boilingPointK: 1156, // 882.9 °C
+    particleType: 'metallic',
+    color: '#f8fafc',
+    themeColor: 'amber',
+    desc: 'فلز قلوي ناعم ولامع يمكن قطعه بالسكين، ينصهر تحت درجة غليان الماء عند 97.8 °C، ويشتعل بلهب أصفر ساطع عند ملامسة الماء.',
+    descEn: 'Soft, lustrous alkali metal easily cut with a butter knife; melts below water boiling point at 97.8 °C and bursts into yellow flames in water.',
+    defaultTempK: 298,
+    mass: 22.99
+  },
+  hydrogen: {
+    id: 'hydrogen',
+    name: 'الهيدروجين',
+    nameEn: 'Hydrogen',
+    formula: 'H₂',
+    meltingPointK: 14.01, // -259.14 °C
+    boilingPointK: 20.28, // -252.87 °C
+    particleType: 'diatomic',
+    color: '#e0f2fe',
+    themeColor: 'sky',
+    desc: 'أخف غاز في الكون وأدناها نقطة غليان بعد الهيليوم (20.3 K)، يتصرف كوقود فائق للاندماج النووي ولصواريخ الفضاء.',
+    descEn: 'Lightest gas in the universe with the second lowest boiling point (20.3 K), serving as rocket cryogenic propellant and stellar fusion fuel.',
+    defaultTempK: 30,
+    mass: 2.016
+  },
+  ammonia: {
+    id: 'ammonia',
+    name: 'الأمونيا (النشادر)',
+    nameEn: 'Ammonia',
+    formula: 'NH₃',
+    meltingPointK: 195.42, // -77.73 °C
+    boilingPointK: 239.81, // -33.34 °C
+    particleType: 'ammonia',
+    color: '#38bdf8',
+    themeColor: 'sky',
+    desc: 'مركب هرمي ثلاثي القاعدة ذو روابط هيدروجينية قوية ورائحة حادة، مبرد صناعي فائق وسهل الإسالة عند -33.3 °C.',
+    descEn: 'Pyramidal polar molecule with strong hydrogen bonds and pungent scent; key industrial refrigerant liquifying at -33.3 °C.',
+    defaultTempK: 220,
+    mass: 17.031
+  },
+  tungsten: {
+    id: 'tungsten',
+    name: 'التنغستن (الفولفرام)',
+    nameEn: 'Tungsten',
+    formula: 'W',
+    meltingPointK: 3695, // 3422 °C
+    boilingPointK: 6203, // 5930 °C
+    particleType: 'metallic',
+    color: '#64748b',
+    themeColor: 'slate',
+    desc: 'صاحب أعلى نقطة انصهار بين جميع المعادن والعناصر في الجدول الدوري (3695 K / 3422 °C)! يحتفظ بصلابته في درجات حرارة أفران الصهر الفائقة.',
+    descEn: 'Element with the highest melting point of all metals (3695 K / 3422 °C) and second highest boiling point (6203 K) in the periodic table.',
+    defaultTempK: 300,
+    mass: 183.84
+  },
+  carbon: {
+    id: 'carbon',
+    name: 'الكربون (الجرافيت)',
+    nameEn: 'Carbon (Graphite)',
+    formula: 'C',
+    meltingPointK: 3800, // Sublimation at 1 atm
+    boilingPointK: 4300,
+    particleType: 'monatomic',
+    color: '#334155',
+    themeColor: 'slate',
+    desc: 'حجر الزاوية في الكيمياء العضوية والحياة، شبكته التساهمية العملاقة لا تنصهر تحت الضغط العادي بل تتسامى مباشرة عند 3900 K!',
+    descEn: 'The cornerstone of organic life; its giant covalent network does not melt at 1 atm but sublimates directly at an astonishing 3900 K!',
+    defaultTempK: 300,
+    mass: 12.011,
+    isSublimating: true,
+    criticalPressureAtm: 100
   }
 };
 
-export type MatterPhase = 'solid' | 'melting' | 'liquid' | 'boiling' | 'gas';
+export type MatterPhase = 'solid' | 'melting' | 'liquid' | 'boiling' | 'gas' | 'plasma';
 
 export function calculateEffectiveBoilingPoint(substance: SubstanceInfo, pressureAtm: number): number {
   // Clausius-Clapeyron approx: higher pressure raises boiling point
@@ -287,6 +441,10 @@ export function calculateEffectiveBoilingPoint(substance: SubstanceInfo, pressur
 export function calculateEffectiveMeltingPoint(substance: SubstanceInfo, pressureAtm: number): number {
   // Pressure has slight effect on melting point
   return substance.meltingPointK * (1 + (pressureAtm - 1) * 0.002);
+}
+
+export function calculatePlasmaThreshold(substance: SubstanceInfo): number {
+  return Math.max(1600, Math.min(8000, substance.boilingPointK * 2.2));
 }
 
 export function calculatePhase(
@@ -307,6 +465,21 @@ export function calculatePhase(
   const tolerance = Math.max(1.5, Math.abs(Tb - Tm) * 0.06);
 
   const isAr = lang === 'ar';
+  const plasmaThreshold = calculatePlasmaThreshold(substance);
+
+  // Check for Plasma State (Thermal Ionization / Extreme Energy)
+  if (tempK >= plasmaThreshold || tempK >= 5500) {
+    return {
+      phase: 'plasma',
+      phaseName: isAr ? 'حالة البلازما (تأين فائق)' : 'Plasma State (Thermal Ionization)',
+      badgeClass: 'bg-purple-950/90 text-purple-300 border-purple-500/80 shadow-purple-500/20 shadow-md',
+      detail: isAr
+        ? `الحرارة الفائقة (${tempK.toFixed(0)} K) تفوق عتبة التأين (${plasmaThreshold.toFixed(0)} K). انتزعت الإلكترونات من الذرات لتتحول المادة إلى بلازما مشحونة متوهجة تتأثر بالمجالات الكهرومغناطيسية.`
+        : `Extreme temperature (${tempK.toFixed(0)} K) exceeds ionization threshold (${plasmaThreshold.toFixed(0)} K). Valence electrons are stripped, creating a glowing ionized plasma governed by electromagnetic forces.`,
+      effectiveTm: Tm,
+      effectiveTb: Tb
+    };
+  }
 
   // Special CO2 sublimation check at normal atmospheric pressure (< 5.1 atm)
   if (substance.isSublimating && pressureAtm < 5.1) {

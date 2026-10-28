@@ -49,6 +49,7 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
 
   // 3D View Modes & Settings
   const [viewType, setViewType] = useState<ModelViewType>('bohr_spatial');
+  const [orbitalFilter, setOrbitalFilter] = useState<'all' | 's' | 'p' | 'd'>('all');
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const [showRings, setShowRings] = useState<boolean>(true);
   const [showNucleusCluster, setShowNucleusCluster] = useState<boolean>(true);
@@ -162,18 +163,24 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
     const protonGeo = new THREE.SphereGeometry(sphereR, 20, 20);
     const neutronGeo = new THREE.SphereGeometry(sphereR, 20, 20);
 
-    const protonMat = new THREE.MeshStandardMaterial({
+    const protonMat = new THREE.MeshPhysicalMaterial({
       color: 0xef4444,
-      emissive: 0x7f1d1d,
-      emissiveIntensity: 0.5,
-      roughness: 0.25,
-      metalness: 0.3
+      emissive: 0x991b1b,
+      emissiveIntensity: 0.65,
+      roughness: 0.18,
+      metalness: 0.25,
+      clearcoat: 0.85,
+      clearcoatRoughness: 0.1
     });
 
-    const neutronMat = new THREE.MeshStandardMaterial({
+    const neutronMat = new THREE.MeshPhysicalMaterial({
       color: 0x94a3b8,
-      roughness: 0.35,
-      metalness: 0.55
+      emissive: 0x334155,
+      emissiveIntensity: 0.25,
+      roughness: 0.22,
+      metalness: 0.70,
+      clearcoat: 0.90,
+      clearcoatRoughness: 0.1
     });
 
     let clusterMaxRadius = 2.0;
@@ -274,19 +281,23 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
     const baseRadius = Math.max(9.0, clusterMaxRadius + 4.2);
     const radiusStep = 5.2;
 
-    // Electron Geometries & Materials
-    const electronGeo = new THREE.SphereGeometry(0.75, 16, 16);
-    const spinUpMat = new THREE.MeshStandardMaterial({
-      color: 0x06b6d4, // Cyan
-      emissive: 0x0891b2,
-      emissiveIntensity: 0.6,
-      roughness: 0.2
+    // Electron Geometries & Materials with high-fidelity MeshPhysicalMaterial
+    const electronGeo = new THREE.SphereGeometry(0.75, 18, 18);
+    const spinUpMat = new THREE.MeshPhysicalMaterial({
+      color: 0x38bdf8,
+      emissive: 0x06b6d4,
+      emissiveIntensity: 0.85,
+      roughness: 0.15,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05
     });
-    const spinDownMat = new THREE.MeshStandardMaterial({
-      color: 0xf97316, // Orange
-      emissive: 0xc2410c,
-      emissiveIntensity: 0.6,
-      roughness: 0.2
+    const spinDownMat = new THREE.MeshPhysicalMaterial({
+      color: 0xfb923c,
+      emissive: 0xea580c,
+      emissiveIntensity: 0.85,
+      roughness: 0.15,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.05
     });
 
     if (viewType === 'bohr_spatial') {
@@ -476,58 +487,164 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
     }
 
     // --- C. QUANTUM PROBABILITY CLOUD MODE (|ψ|²) ---
+    // Authentic Schrödinger wavefunctions ψ_nlm(r, θ, φ) and Acceptance-Rejection Sampling
     let cloudPoints: THREE.Points | null = null;
     if (viewType === 'quantum_cloud') {
-      const particleCount = Math.min(3000, 400 + electrons * 120);
+      const particleCount = Math.min(4500, 800 + electrons * 160);
       const cloudPositions = new Float32Array(particleCount * 3);
       const cloudColors = new Float32Array(particleCount * 3);
 
-      const color1 = new THREE.Color(0x06b6d4); // Cyan
-      const color2 = new THREE.Color(0x8b5cf6); // Purple
-      const color3 = new THREE.Color(0xf43f5e); // Rose
+      const colorPeak = new THREE.Color(0x22d3ee);  // Cyan for high probability density antinodes
+      const colorMid = new THREE.Color(0xa855f7);   // Purple for medium density
+      const colorTail = new THREE.Color(0x312e81);  // Deep indigo for exponential tails
+      const colorNode = new THREE.Color(0x0284c7);  // Royal blue near nodes
 
-      for (let i = 0; i < particleCount; i++) {
-        // Quantum orbital distribution with exponential radial decay and angular lobes (s, p, d)
-        const shellTarget = 1 + Math.floor(Math.random() * Math.min(5, shells.filter(s => s > 0).length || 1));
-        const rMean = baseRadius * (0.6 + shellTarget * 0.45);
-        // Exponential radial distribution simulating hydrogenic radial wavefunctions R_nl(r)
-        const u1 = Math.random();
-        const u2 = Math.random();
-        const r = rMean * Math.sqrt(-2 * Math.log(Math.max(0.0001, u1))) * (0.7 + 0.3 * u2);
+      // Active subshells to sample based on atom's electron count and user's orbital filter
+      const availableOrbitals: ('1s' | '2s' | '2px' | '2py' | '2pz' | '3s' | '3px' | '3py' | '3pz' | '3d_z2' | '3d_xy' | '3d_x2y2')[] = [];
 
-        // Spherical angles
-        const theta = Math.acos(2 * Math.random() - 1);
-        const phi = 2 * Math.PI * Math.random();
-
-        // Add spherical harmonic probability shaping: P-orbitals (dumbbell shapes)
-        let probWeight = 1.0;
-        if (shellTarget >= 2) {
-          probWeight = Math.pow(Math.cos(theta), 2) + 0.2; // Dumbbell lobe bias
+      // Determine populated orbitals by Aufbau principle
+      if (orbitalFilter === 'all' || orbitalFilter === 's') {
+        availableOrbitals.push('1s');
+        if (electrons > 2) availableOrbitals.push('2s');
+        if (electrons > 10) availableOrbitals.push('3s');
+      }
+      if (orbitalFilter === 'all' || orbitalFilter === 'p') {
+        if (electrons > 4 || orbitalFilter === 'p') {
+          availableOrbitals.push('2px', '2py', '2pz');
         }
+        if (electrons > 12) {
+          availableOrbitals.push('3px', '3py', '3pz');
+        }
+      }
+      if (orbitalFilter === 'all' || orbitalFilter === 'd') {
+        if (electrons > 20 || orbitalFilter === 'd') {
+          availableOrbitals.push('3d_z2', '3d_xy', '3d_x2y2');
+        }
+      }
 
-        const effectiveR = r * (0.8 + 0.4 * probWeight);
+      if (availableOrbitals.length === 0) {
+        availableOrbitals.push('1s');
+      }
 
-        cloudPositions[i * 3] = effectiveR * Math.sin(theta) * Math.cos(phi);
-        cloudPositions[i * 3 + 1] = effectiveR * Math.cos(theta);
-        cloudPositions[i * 3 + 2] = effectiveR * Math.sin(theta) * Math.sin(phi);
+      // Exact Hydrogenic Probability Density Evaluator: P(r, θ, φ) = r² |ψ_nlm|²
+      const evaluateDensity = (
+        orb: '1s' | '2s' | '2px' | '2py' | '2pz' | '3s' | '3px' | '3py' | '3pz' | '3d_z2' | '3d_xy' | '3d_x2y2',
+        r: number,
+        theta: number,
+        phi: number
+      ): number => {
+        const sinT = Math.sin(theta);
+        const cosT = Math.cos(theta);
+        const sinP = Math.sin(phi);
+        const cosP = Math.cos(phi);
 
-        // Gradient color from inner cyan to outer violet
-        const lerpVal = Math.min(1, effectiveR / (baseRadius * 3.5));
-        const pColor = color1.clone().lerp(color2, lerpVal).lerp(color3, lerpVal * 0.4);
-        cloudColors[i * 3] = pColor.r;
-        cloudColors[i * 3 + 1] = pColor.g;
-        cloudColors[i * 3 + 2] = pColor.b;
+        if (orb === '1s') {
+          // ψ_100 = 2 * exp(-r), P = r² * 4 * exp(-2r)
+          const psi = 2 * Math.exp(-r);
+          return r * r * psi * psi;
+        }
+        if (orb === '2s') {
+          // ψ_200 = (1/2√2) * (2 - r) * exp(-r/2). Radial node at r = 2.0!
+          const psi = (2 - r) * Math.exp(-r / 2);
+          return r * r * psi * psi * 0.45;
+        }
+        if (orb === '2pz') {
+          // ψ_210 = (1/2√6) * r * exp(-r/2) * cos(θ). Dumbbell along Z!
+          const psi = r * Math.exp(-r / 2) * cosT;
+          return r * r * psi * psi * 0.45;
+        }
+        if (orb === '2px') {
+          // Dumbbell along X: sin(θ)*cos(φ)
+          const psi = r * Math.exp(-r / 2) * (sinT * cosP);
+          return r * r * psi * psi * 0.45;
+        }
+        if (orb === '2py') {
+          // Dumbbell along Y: sin(θ)*sin(φ)
+          const psi = r * Math.exp(-r / 2) * (sinT * sinP);
+          return r * r * psi * psi * 0.45;
+        }
+        if (orb === '3s') {
+          // ψ_300 has TWO radial nodes!
+          const rho = (2 * r) / 3;
+          const psi = (6 - 6 * rho + rho * rho) * Math.exp(-rho / 2);
+          return r * r * psi * psi * 0.025;
+        }
+        if (orb === '3px' || orb === '3py' || orb === '3pz') {
+          const rho = (2 * r) / 3;
+          const angular = orb === '3pz' ? cosT : orb === '3px' ? sinT * cosP : sinT * sinP;
+          const psi = (4 - rho) * rho * Math.exp(-rho / 2) * angular;
+          return r * r * psi * psi * 0.035;
+        }
+        if (orb === '3d_z2') {
+          // Torus + 2 lobes: (3*cos²θ - 1)
+          const rho = (2 * r) / 3;
+          const psi = rho * rho * Math.exp(-rho / 2) * (3 * cosT * cosT - 1);
+          return r * r * psi * psi * 0.028;
+        }
+        if (orb === '3d_xy') {
+          // Cloverleaf in xy plane: sin²θ * sin(2φ)
+          const rho = (2 * r) / 3;
+          const psi = rho * rho * Math.exp(-rho / 2) * (sinT * sinT * Math.sin(2 * phi));
+          return r * r * psi * psi * 0.08;
+        }
+        // 3d_x2y2 cloverleaf: sin²θ * cos(2φ)
+        const rho = (2 * r) / 3;
+        const psi = rho * rho * Math.exp(-rho / 2) * (sinT * sinT * Math.cos(2 * phi));
+        return r * r * psi * psi * 0.08;
+      };
+
+      // Scale factor to map atomic Bohr radii to 3D scene units
+      const a0Scale = 4.2;
+      let acceptedCount = 0;
+      let attempts = 0;
+      const maxAttempts = particleCount * 25;
+
+      while (acceptedCount < particleCount && attempts < maxAttempts) {
+        attempts++;
+        const targetOrb = availableOrbitals[Math.floor(Math.random() * availableOrbitals.length)];
+
+        // Radial coordinate sampling r ∈ [0.1, 14.0]
+        const maxR = targetOrb.startsWith('3') ? 14.0 : targetOrb.startsWith('2') ? 10.0 : 6.0;
+        const rBohr = 0.1 + Math.random() * maxR;
+        const theta = Math.acos(2 * Math.random() - 1); // uniform spherical distribution
+        const phi = Math.random() * Math.PI * 2;
+
+        const density = evaluateDensity(targetOrb, rBohr, theta, phi);
+        const maxProbEstimate = 0.65; // normalization reference
+
+        // Acceptance-Rejection test
+        if (Math.random() < density / maxProbEstimate) {
+          const rSpatial = rBohr * a0Scale;
+          const x = rSpatial * Math.sin(theta) * Math.cos(phi);
+          const y = rSpatial * Math.cos(theta);
+          const z = rSpatial * Math.sin(theta) * Math.sin(phi);
+
+          cloudPositions[acceptedCount * 3] = x;
+          cloudPositions[acceptedCount * 3 + 1] = y;
+          cloudPositions[acceptedCount * 3 + 2] = z;
+
+          // Compute color gradient according to local quantum density:
+          // Antinodes (high density) -> Electric Cyan / Emerald, Nodes/Tails -> Indigo
+          const normDensity = Math.min(1.0, density / 0.35);
+          const pColor = colorTail.clone().lerp(colorMid, normDensity * 0.7).lerp(colorPeak, Math.pow(normDensity, 1.8));
+
+          cloudColors[acceptedCount * 3] = pColor.r;
+          cloudColors[acceptedCount * 3 + 1] = pColor.g;
+          cloudColors[acceptedCount * 3 + 2] = pColor.b;
+
+          acceptedCount++;
+        }
       }
 
       const cloudGeo = new THREE.BufferGeometry();
-      cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPositions, 3));
-      cloudGeo.setAttribute('color', new THREE.BufferAttribute(cloudColors, 3));
+      cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPositions.subarray(0, acceptedCount * 3), 3));
+      cloudGeo.setAttribute('color', new THREE.BufferAttribute(cloudColors.subarray(0, acceptedCount * 3), 3));
 
       const cloudMat = new THREE.PointsMaterial({
-        size: 1.4,
+        size: 1.5,
         vertexColors: true,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.72,
         blending: THREE.AdditiveBlending
       });
 
@@ -654,6 +771,7 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
     electrons,
     shells,
     viewType,
+    orbitalFilter,
     showRings,
     showNucleusCluster,
     showSpinArrows,
@@ -845,6 +963,32 @@ export const AtomViewer3D: React.FC<AtomViewer3DProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Quantum Subshell Filter Floating Selector (s, p, d, all) */}
+      {viewType === 'quantum_cloud' && (
+        <div className="absolute top-12 left-2 flex items-center gap-1 bg-slate-950/90 border border-cyan-500/40 backdrop-blur-md p-1 rounded-xl z-20 shadow-xl">
+          <span className="text-[9px] font-mono font-bold text-cyan-400 px-1">
+            {t('المدار:', 'Orbital:')}
+          </span>
+          {(['all', 's', 'p', 'd'] as const).map(orb => (
+            <button
+              key={orb}
+              type="button"
+              onClick={() => {
+                playLabSound('click');
+                setOrbitalFilter(orb);
+              }}
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                orbitalFilter === orb
+                  ? 'bg-cyan-600 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              {orb === 'all' ? t('الكل', 'All') : orb === 's' ? 's (كروي)' : orb === 'p' ? 'p (فصوص)' : 'd (رباعي)'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Floating Zoom & Reset Camera Controls */}
       <div className="absolute right-2 bottom-2 flex flex-col gap-1 z-10">

@@ -457,6 +457,34 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         life: 0.9,
         pType: 'neutrino'
       });
+    } else if (activeIsotope.decayMode === 'positron') {
+      // Positron (e+) emission + Electron Neutrino
+      const angle1 = -Math.PI / 8;
+      const angle2 = Math.PI / 6;
+
+      list.push({
+        x: cx + 15,
+        y: cy,
+        vx: Math.cos(angle1) * 6.2,
+        vy: Math.sin(angle1) * 6.2,
+        size: 5.0,
+        color: '#ec4899',
+        label: 'بوزيترون مضاد (e⁺)',
+        life: 1.0,
+        pType: 'beta'
+      });
+
+      list.push({
+        x: cx + 15,
+        y: cy,
+        vx: Math.cos(angle2) * 7.5,
+        vy: Math.sin(angle2) * 7.5,
+        size: 2.5,
+        color: '#a855f7',
+        label: 'نيوترينو إلكتروني (νₑ)',
+        life: 0.9,
+        pType: 'neutrino'
+      });
     } else {
       // Beta + Gamma photons
       const angle1 = -Math.PI / 7;
@@ -529,6 +557,8 @@ export const RadioactiveDecay: React.FC<RadioactiveDecayProps> = ({ onOpenGuide 
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 text-xs font-bold no-scrollbar flex-1">
           {[
             { id: 'carbon14', label: t('🦴 تأريخ الأحافير (¹⁴C)', '🦴 Carbon Dating (¹⁴C)') },
+            { id: 'fluorine18', label: t('🧠 بوزيترون ومسح الأورام (¹⁸F)', '🧠 Positron PET (¹⁸F)') },
+            { id: 'tritium', label: t('☀️ وقود الاندماج (³H)', '☀️ Fusion Fuel (³H)') },
             { id: 'cobalt60', label: t('🏥 علاج الأورام (⁶⁰Co)', '🏥 Cancer Therapy (⁶⁰Co)') },
             { id: 'iodine131', label: t('🧬 الغدة الدرقية (¹³¹I)', '🧬 Thyroid Med (¹³¹I)') },
             { id: 'americium241', label: t('🔔 كاشف الدخان (²⁴¹Am)', '🔔 Smoke Detector (²⁴¹Am)') },
